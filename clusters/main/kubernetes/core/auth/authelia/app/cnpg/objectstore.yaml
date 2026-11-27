@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/barmancloud.cnpg.io/objectstore_v1.json
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: authelia-rustfs
+  namespace: authelia
+spec:
+  configuration:
+    destinationPath: s3://${S3BUCKET}-authelia/authelia/cnpg
+    s3Credentials:
+      accessKeyId:
+        name: authelia-postgres-rustfs
+      secretAccessKey:
+        name: authelia-postgres-rustfs

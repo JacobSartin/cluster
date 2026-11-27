@@ -1,0 +1,36 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cloudflared
+  namespace: cloudflared
+spec:
+  groups:
+    - name: cloudflared
+      rules:
+        - alert: CloudflaredTunnelConnectionsLow
+          expr: cloudflared_tunnel_ha_connections < 4
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'cloudflared {{ $labels.pod }} holds {{ $value }} of 4 edge connections'
+            description: Edge connections have kept failing for 10 minutes. Check the pod logs for registration errors.
+
+        - alert: CloudflaredTunnelDown
+          expr: cloudflared_tunnel_ha_connections == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'cloudflared {{ $labels.pod }} has no edge connection'
+            description: The replica serves nothing from the internet. Check the pod logs and the tunnel credentials.
+
+        - alert: CloudflaredMetricsMissing
+          expr: absent(up{job="cloudflared"} == 1)
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: cloudflared metrics are missing
+            description: Prometheus has not seen a healthy cloudflared target for 10 minutes; the public entry point may be down.

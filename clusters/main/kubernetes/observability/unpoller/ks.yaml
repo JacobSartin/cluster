@@ -1,0 +1,30 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: unpoller
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: prometheus-operator-crds
+  interval: 10m
+  path: clusters/main/kubernetes/observability/unpoller/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: unpoller-dashboards
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: unpoller
+    - name: grafana-operator
+  interval: 10m
+  path: clusters/main/kubernetes/observability/unpoller/dashboards
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster

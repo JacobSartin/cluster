@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: cs2-token
+    namespace: cs2
+type: Opaque
+stringData:
+    token: ENC[AES256_GCM,data:EkPxIVEAE3+J8SsrMCbqGQmMcTCkLVgiBAg1EceL9Aw=,iv:+o0ewudmbh3QsayM+/0WQ2IJSMfp4c5nPvEU84YLgtg=,tag:eHG/Kwbea3oTQ5jq7/+cBg==,type:str]
+    rcon-password: ENC[AES256_GCM,data:o7eSpqlGqIaffRD5TNhcEahcnhGeTFUV4nFdVHs5FtgNRBtwDrxxda8IMQ==,iv:CCLIhy/epwScfGH5Ex6vQJ6bM9vAq/1t7EsMEdN7J1c=,tag:fHChGuNMcyU52lyhw5kCJg==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPWDB3bWl6bWpRSlNuQzEw
+            b1BESG1jSm1pcFg3TC8yMGtwSUNJcmFnMW5JCkEyWTVqUjhTY0xWNHZxYWwrN21Y
+            QjFJZ3RXK0NQUk96VlNwN2E3K2dxaTQKLS0tIExOcml0bjlQQnRBQmxiZ251TDdZ
+            c1M4ekJHY05JR09oMVNMcEd5MUhoTkEKjI6/uAndL1X8gMhPq6CIymF1h9suZLHM
+            ah7S6CYi15p/x8IKPsePbxmSuYAQSIS06kvwtygu+4aiL0JA45To3w==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1tpc0yytufplgg0gucz7ze52vhx0c0j6lvzctmy0kfg4fhyy444gqedj494
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBBTGxUY041WVJlcWV0RkJ4
+            NWVBRnJSNXg1VDc3TTdIMVkvak9CUEVPbVJjClYweDhMdVNYb2xieU5nU0tPYXdx
+            VFNLSm5SaUVxaTdlcm5ZcWdCZnM3cTgKLS0tIFFKQWdqVHF2cXk0VFg5eWlNNlUw
+            M0RGTnQrbFNmRGY4OVg1Z1k3T1ZuYjAKb4rZI2jFuMDcDMlQY90NUcCFF8eSU1ws
+            Hp811P7atuDP0NP6qf67xUf5p0B1lVAzq9HyKGpG9X7l1+yC45SXHA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1h8c7nenuf7rn6qjmackxrlt3nvjfyk77mw7ujnrsnnspkcle8s7qjsamhs
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-10-13T22:29:20Z"
+    mac: ENC[AES256_GCM,data:/XSFJrqVEPARPELrX1aiFSH9tWKtHB84sJMGXYn4E6xZ0GqK2/tgi7hzjaNDJMxm204xcpFPL3UII1szJ3C05hmJ47QzNbcrys9c61vt4gKUjke8gvNymXKVL0D1UtcWqQ8IT1h5UxDmzSAX3/GQI6Apt3FucJHY/60Y88LO9cc=,iv:UFFVzHbrVqG0uIGuoixlWfyz14MBQaKHHcPi9BcSnDk=,tag:HZ0tUad/i3+N07LcY0HPJA==,type:str]
+    version: 3.13.3

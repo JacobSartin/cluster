@@ -1,0 +1,153 @@
+---
+# Scope namespaces in bindings; namespaceObject is unreliable in matchConditions.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: private-tenant-owner
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["*"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["*"]
+  matchConditions:
+    - name: private-tenant-identity
+      expression: request.userInfo.username == 'system:serviceaccount:private-system:flux'
+  variables:
+    - name: tenantLabel
+      expression: "'capsule.clastix.io/tenant'"
+    - name: namespaced
+      expression: has(request.namespace) && request.namespace != ''
+    - name: isNamespace
+      expression: request.resource.group == '' && request.resource.resource == 'namespaces'
+    - name: labeledNamespace
+      expression: >-
+        namespaceObject != null && has(namespaceObject.metadata.labels) &&
+        variables.tenantLabel in namespaceObject.metadata.labels &&
+        namespaceObject.metadata.labels[variables.tenantLabel] == 'private'
+    - name: newHasLabel
+      expression: >-
+        object != null && has(object.metadata.labels) &&
+        variables.tenantLabel in object.metadata.labels &&
+        object.metadata.labels[variables.tenantLabel] == 'private'
+    - name: oldHasLabel
+      expression: >-
+        oldObject != null && has(oldObject.metadata.labels) &&
+        variables.tenantLabel in oldObject.metadata.labels &&
+        oldObject.metadata.labels[variables.tenantLabel] == 'private'
+  validations:
+    - expression: variables.namespaced || variables.isNamespace
+      message: private tenant may only write Namespaces and namespaced resources
+    # For Namespace requests request.namespace is the namespace name itself.
+    - expression: "variables.isNamespace || !variables.namespaced || request.namespace == 'private-system' || variables.labeledNamespace"
+      message: private tenant may only write inside private-system or namespaces labeled capsule.clastix.io/tenant=private
+    - expression: "!variables.isNamespace || request.operation != 'CREATE' || variables.newHasLabel"
+      message: namespaces created by the private tenant must carry capsule.clastix.io/tenant=private
+    - expression: "!variables.isNamespace || request.operation != 'UPDATE' || (variables.oldHasLabel && variables.newHasLabel)"
+      message: private tenant may only update namespaces it owns and may not drop the tenant label
+    - expression: "!variables.isNamespace || request.operation != 'DELETE' || variables.oldHasLabel"
+      message: private tenant may only delete namespaces it owns
+    - expression: request.resource.group != 'rbac.authorization.k8s.io' || request.resource.resource == 'rolebindings'
+      message: private tenant may write RoleBindings only, no other RBAC resources
+    - expression: >-
+        request.resource.group != 'rbac.authorization.k8s.io' || request.operation == 'DELETE' ||
+        (object.roleRef.apiGroup == 'rbac.authorization.k8s.io' && object.roleRef.kind == 'ClusterRole' &&
+         object.roleRef.name == 'private-tenant-namespace-admin' &&
+         (!has(object.subjects) || object.subjects.all(s,
+           s.kind == 'ServiceAccount' && s.name == 'flux' && has(s.namespace) &&
+           (s.namespace == 'private-system' || s.namespace == request.namespace))))
+      message: private tenant RoleBindings must bind ClusterRole private-tenant-namespace-admin to private-system/flux or the flux ServiceAccount of the same namespace
+    - expression: request.resource.group != 'admissionregistration.k8s.io'
+      message: private tenant may not modify admission configuration
+    - expression: "!variables.namespaced || !(request.namespace in ['flux-system', 'kube-system'])"
+      message: private tenant may not write to flux-system or kube-system
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: private-tenant-owner
+spec:
+  policyName: private-tenant-owner
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: private-tenant-pods
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods", "pods/ephemeralcontainers"]
+  variables:
+    - name: allowedCapabilities
+      expression: "['NET_ADMIN', 'NET_RAW', 'MKNOD', 'CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'SETUID', 'SETGID', 'KILL', 'NET_BIND_SERVICE']"
+    - name: safeSysctls
+      expression: >-
+        ['kernel.shm_rmid_forced', 'net.ipv4.ip_local_port_range', 'net.ipv4.ip_unprivileged_port_start',
+         'net.ipv4.tcp_syncookies', 'net.ipv4.ping_group_range', 'net.ipv4.ip_local_reserved_ports',
+         'net.ipv4.tcp_keepalive_time', 'net.ipv4.tcp_fin_timeout', 'net.ipv4.tcp_keepalive_intvl',
+         'net.ipv4.tcp_keepalive_probes', 'net.ipv4.tcp_rmem', 'net.ipv4.tcp_wmem']
+    - name: initContainers
+      expression: "has(object.spec.initContainers) ? object.spec.initContainers : []"
+    - name: ephemeralContainers
+      expression: "has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers : []"
+  validations:
+    - expression: "!has(object.spec.hostNetwork) || !object.spec.hostNetwork"
+      message: private tenant pods may not use hostNetwork
+    - expression: "!has(object.spec.hostPID) || !object.spec.hostPID"
+      message: private tenant pods may not use hostPID
+    - expression: "!has(object.spec.hostIPC) || !object.spec.hostIPC"
+      message: private tenant pods may not use hostIPC
+    - expression: "!has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.hostPath))"
+      message: private tenant pods may not mount hostPath volumes
+    - expression: >-
+        !has(object.spec.securityContext) || !has(object.spec.securityContext.sysctls) ||
+        object.spec.securityContext.sysctls.all(s, s.name in variables.safeSysctls)
+      message: private tenant pods may only set safe sysctls
+    - expression: >-
+        !has(object.spec.securityContext) || !has(object.spec.securityContext.seccompProfile) ||
+        object.spec.securityContext.seccompProfile.type != 'Unconfined'
+      message: private tenant pods may not disable seccomp
+    - expression: >-
+        object.spec.containers.all(c, !has(c.securityContext) || !has(c.securityContext.privileged) || !c.securityContext.privileged) &&
+        variables.initContainers.all(c, !has(c.securityContext) || !has(c.securityContext.privileged) || !c.securityContext.privileged) &&
+        variables.ephemeralContainers.all(c, !has(c.securityContext) || !has(c.securityContext.privileged) || !c.securityContext.privileged)
+      message: private tenant containers may not be privileged
+    - expression: >-
+        object.spec.containers.all(c, !has(c.securityContext) || !has(c.securityContext.capabilities) || !has(c.securityContext.capabilities.add) || c.securityContext.capabilities.add.all(cap, cap in variables.allowedCapabilities)) &&
+        variables.initContainers.all(c, !has(c.securityContext) || !has(c.securityContext.capabilities) || !has(c.securityContext.capabilities.add) || c.securityContext.capabilities.add.all(cap, cap in variables.allowedCapabilities)) &&
+        variables.ephemeralContainers.all(c, !has(c.securityContext) || !has(c.securityContext.capabilities) || !has(c.securityContext.capabilities.add) || c.securityContext.capabilities.add.all(cap, cap in variables.allowedCapabilities))
+      message: private tenant containers may only add NET_ADMIN, NET_RAW, MKNOD, CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, KILL or NET_BIND_SERVICE
+    - expression: >-
+        object.spec.containers.all(c, !has(c.securityContext) || !has(c.securityContext.procMount) || c.securityContext.procMount == 'Default') &&
+        variables.initContainers.all(c, !has(c.securityContext) || !has(c.securityContext.procMount) || c.securityContext.procMount == 'Default') &&
+        variables.ephemeralContainers.all(c, !has(c.securityContext) || !has(c.securityContext.procMount) || c.securityContext.procMount == 'Default')
+      message: private tenant containers may not unmask /proc
+    - expression: >-
+        object.spec.containers.all(c, !has(c.securityContext) || !has(c.securityContext.seccompProfile) || c.securityContext.seccompProfile.type != 'Unconfined') &&
+        variables.initContainers.all(c, !has(c.securityContext) || !has(c.securityContext.seccompProfile) || c.securityContext.seccompProfile.type != 'Unconfined') &&
+        variables.ephemeralContainers.all(c, !has(c.securityContext) || !has(c.securityContext.seccompProfile) || c.securityContext.seccompProfile.type != 'Unconfined')
+      message: private tenant containers may not disable seccomp
+    - expression: >-
+        object.spec.containers.all(c, !has(c.ports) || c.ports.all(p, !has(p.hostPort) || p.hostPort == 0)) &&
+        variables.initContainers.all(c, !has(c.ports) || c.ports.all(p, !has(p.hostPort) || p.hostPort == 0)) &&
+        variables.ephemeralContainers.all(c, !has(c.ports) || c.ports.all(p, !has(p.hostPort) || p.hostPort == 0))
+      message: private tenant containers may not bind host ports
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: private-tenant-pods
+spec:
+  policyName: private-tenant-pods
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        capsule.clastix.io/tenant: private

@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/external-secrets.io/externalsecret_v1.json
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: minecraft-java-restic
+  namespace: minecraft
+spec:
+  refreshInterval: 1h
+  target:
+    name: minecraft-java-restic
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      type: Opaque
+      data:
+        RESTIC_PASSWORD: '{{ if lt (len .resticRoot) 64 }}{{ .resticRootTooShort }}{{ end }}{{ printf "%s:minecraft/minecraft-java-restic" .resticRoot | sha256sum }}'
+  data:
+    - secretKey: resticRoot
+      sourceRef:
+        storeRef:
+          kind: ClusterSecretStore
+          name: backup
+      remoteRef:
+        key: backup
+        property: restic-root

@@ -1,0 +1,31 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumnetworkpolicy_v2.json
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: lldap-ingress
+  namespace: lldap
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: lldap
+      app.kubernetes.io/controller: main
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.cilium.k8s.namespace.labels.network.jacobsartin.com/lldap: client
+      toPorts:
+        - ports:
+            - port: "3890"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: traefik-internal
+            app.kubernetes.io/name: traefik
+        - matchLabels:
+            app.kubernetes.io/name: lldap
+            app.kubernetes.io/controller: service-accounts
+      toPorts:
+        - ports:
+            - port: "17170"
+              protocol: TCP

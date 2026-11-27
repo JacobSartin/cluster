@@ -1,0 +1,14 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  customManagers: [
+    {
+      customType: "regex",
+      description: "Update a version on the line after a '# renovate: datasource=... depName=...' marker",
+      managerFilePatterns: ["/\\.ya?ml$/"],
+      matchStrings: [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: registryUrl=(?<registryUrl>\\S+))?\\n\\s*[\\w.-]+: \"?(?<currentValue>[^\"\\s]+)\"?",
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n# yaml-language-server: \\$schema=\\S*?/(?<currentValue>v?\\d+\\.\\d+\\.\\d+[^/\\s]*)/",
+      ],
+    },
+  ],
+}

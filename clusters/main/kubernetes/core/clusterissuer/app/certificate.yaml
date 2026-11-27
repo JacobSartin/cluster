@@ -1,0 +1,19 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: certificate-issuer-wildcard
+  namespace: clusterissuer
+spec:
+  secretName: certificate-issuer-wildcard
+  dnsNames:
+    - ${BASE_DOMAIN}
+    - "*.${BASE_DOMAIN}"
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    name: prod
+    kind: ClusterIssuer
+    group: cert-manager.io

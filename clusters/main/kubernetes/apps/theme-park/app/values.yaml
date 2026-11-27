@@ -1,0 +1,127 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  main:
+    forceRename: theme-park
+
+    pod:
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+        supplementalGroups:
+          - 568
+
+    # Recreate the PID directory hidden by the /tmp mount.
+    initContainers:
+      create-nginx-temp:
+        image:
+          repository: docker.io/library/alpine
+          tag: 3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
+
+        command:
+          - /bin/sh
+          - -ec
+        args:
+          - mkdir -p /tmp/nginx-temp
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+    containers:
+      main:
+        image:
+          repository: oci.trueforge.org/containerforge/theme-park
+          tag: 1.24.0@sha256:06708de8aad272d24c501bf1161b55a80fd23c601dfa41622996bb77da0f77a3
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 8080
+              failureThreshold: 30
+              periodSeconds: 5
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 8080
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 8080
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 256Mi
+
+service:
+  main:
+    forceRename: theme-park
+    controller: main
+    ports:
+      main:
+        port: 10244
+        targetPort: 8080
+
+route:
+  main:
+    kind: HTTPRoute
+    labels:
+      gateway-role: internal
+    annotations:
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/name: "Theme Park"
+      gethomepage.dev/group: "Tools"
+      gethomepage.dev/icon: "themepark.png"
+      gethomepage.dev/href: "https://theme-park.${BASE_DOMAIN}"
+      gethomepage.dev/weight: "60"
+    hostnames:
+      - theme-park.${BASE_DOMAIN}
+    parentRefs:
+      - name: internal
+        namespace: traefik-internal
+        sectionName: websecure
+    rules:
+      - backendRefs:
+          - identifier: main
+            port: 10244
+
+persistence:
+  config:
+    type: emptyDir
+
+  tmp:
+    type: emptyDir

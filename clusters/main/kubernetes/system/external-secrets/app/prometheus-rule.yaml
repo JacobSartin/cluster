@@ -1,0 +1,38 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: external-secrets
+  namespace: external-secrets
+spec:
+  groups:
+    - name: external-secrets
+      rules:
+        - alert: ExternalSecretNotReady
+          expr: externalsecret_status_condition{condition="Ready",status="False"} == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'ExternalSecret {{ $labels.exported_namespace }}/{{ $labels.name }} is not syncing'
+            description: The Ready condition has been False for 15 minutes; the target Secret keeps its last value. Check the ExternalSecret events and its store.
+
+        - alert: ExternalSecretStoreNotReady
+          expr: |
+            clustersecretstore_status_condition{condition="Ready",status="False"} == 1
+              or secretstore_status_condition{condition="Ready",status="False"} == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Secret store {{ $labels.name }} is not ready'
+            description: The store has failed validation for 15 minutes, so every ExternalSecret that reads it stops syncing.
+
+        - alert: ExternalSecretsMetricsMissing
+          expr: absent(up{job="external-secrets-metrics"} == 1)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: external-secrets metrics are missing
+            description: Prometheus has not seen a healthy external-secrets target for 15 minutes, so failed syncs would go unnoticed.

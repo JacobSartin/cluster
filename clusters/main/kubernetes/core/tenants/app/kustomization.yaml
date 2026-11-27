@@ -1,0 +1,25 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace-labels.yaml
+  - flux-impersonation.yaml
+  - shared/namespace.yaml
+  - shared/rbac.yaml
+  - shared/policies.yaml
+  - shared/network-policy.yaml
+  - shared/deploy-key.sops.yaml
+  - shared/age-key.sops.yaml
+  - shared/source.yaml
+  - shared/entry.yaml
+  - private/namespace.yaml
+  - private/rbac.yaml
+  - private/tenant.yaml
+  - private/policies.yaml
+  - private/deploy-key.sops.yaml
+  - private/age-key.sops.yaml
+  - private/settings.yaml
+  - private/source.yaml
+  - private/entry.yaml
+  - private/infrastructure-runner.yaml

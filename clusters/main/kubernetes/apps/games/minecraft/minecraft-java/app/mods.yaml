@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minecraft-java-mods
+  namespace: minecraft
+data:
+  MODRINTH_PROJECTS: |
+    appleskin
+    architectury-api
+    balm
+    better-than-mending
+    bluemap
+    c2me-fabric
+    chunky
+    clumps
+    collective
+    debugify
+    distanthorizons:beta
+    easy-elytra-takeoff
+    fabric-api
+    fabric-language-kotlin
+    ferrite-core
+    forge-config-api-port
+    inventory-totem
+    invview
+    keep-my-soil-tilled
+    leaves-be-gone
+    lithium
+    noexpensive
+    puzzles-lib
+    scalablelux
+    servux
+    spark
+    tab-was-taken
+    trashslot
+    xaeros-minimap
+    xaeros-world-map

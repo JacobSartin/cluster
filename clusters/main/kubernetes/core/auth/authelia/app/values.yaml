@@ -1,0 +1,440 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  main:
+    forceRename: authelia
+    annotations:
+      reloader.stakater.com/auto: "true"
+    replicas: 2
+    strategy: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    podDisruptionBudget:
+      maxUnavailable: 1
+
+    pod:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: authelia
+                  app.kubernetes.io/controller: main
+              topologyKey: kubernetes.io/hostname
+
+    containers:
+      main:
+        image:
+          repository: ghcr.io/authelia/authelia
+          tag: 4.39.28@sha256:bd97cff4fcbf715b5ff1f9ae286afbe6033afce385302520b0368122d43a6f54
+
+        env:
+          TZ: ${TZ}
+          AUTHELIA_NOTIFIER_DISABLE_STARTUP_CHECK: "true"
+          X_AUTHELIA_CONFIG: /config/configuration.yaml
+          X_AUTHELIA_CONFIG_FILTERS: template
+          # Disable healthcheck writes on the read-only filesystem.
+          AUTHELIA_SERVER_DISABLE_HEALTHCHECK: "true"
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /api/health
+                port: 9091
+              initialDelaySeconds: 10
+              periodSeconds: 5
+              timeoutSeconds: 5
+              failureThreshold: 30
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /api/health
+                port: 9091
+              periodSeconds: 5
+              timeoutSeconds: 5
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /api/health
+                port: 9091
+              periodSeconds: 30
+              timeoutSeconds: 5
+              failureThreshold: 5
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 96Mi
+
+  valkey:
+    type: statefulset
+    forceRename: authelia-valkey
+    annotations:
+      reloader.stakater.com/auto: "true"
+    replicas: 3
+    statefulset:
+      podManagementPolicy: Parallel
+      serviceName:
+        identifier: valkey
+
+    podDisruptionBudget:
+      maxUnavailable: 1
+    pod:
+      # One per node; a pod runs on another node while its own is down.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+
+      terminationGracePeriodSeconds: 60
+
+    containers:
+      valkey:
+        image:
+          repository: docker.io/valkey/valkey
+          tag: 9.2.1-alpine@sha256:3ad5a213cb1bc2fd4a113c89b6248a88655a6bf1dda69519d04e03cd3e3d2742
+
+        command: ["/bin/sh", "/scripts/valkey.sh", "server"]
+
+        env:
+          VALKEY_PASSWORD:
+            valueFrom:
+              secretKeyRef:
+                name: authelia-valkey
+                key: VALKEY_PASSWORD
+
+        probes:
+          # Allow for the ordinal-based cold-start delay.
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command: ["/bin/sh", "/scripts/valkey.sh", "ready"]
+              periodSeconds: 5
+              timeoutSeconds: 5
+              failureThreshold: 60
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command: ["/bin/sh", "/scripts/valkey.sh", "ready"]
+              periodSeconds: 5
+              timeoutSeconds: 5
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command:
+                  [
+                    "/bin/sh",
+                    "-ec",
+                    'REDISCLI_AUTH="$VALKEY_PASSWORD" valkey-cli -h 127.0.0.1 -p 6379 ping | grep -qx PONG',
+                  ]
+              periodSeconds: 30
+              timeoutSeconds: 5
+
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "/scripts/valkey.sh", "pre-stop"]
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+
+      sentinel:
+        image:
+          repository: docker.io/valkey/valkey
+          tag: 9.2.1-alpine@sha256:3ad5a213cb1bc2fd4a113c89b6248a88655a6bf1dda69519d04e03cd3e3d2742
+
+        command: ["/bin/sh", "/scripts/valkey.sh", "sentinel"]
+
+        env:
+          VALKEY_PASSWORD:
+            valueFrom:
+              secretKeyRef:
+                name: authelia-valkey
+                key: VALKEY_PASSWORD
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command:
+                  [
+                    "/bin/sh",
+                    "-ec",
+                    'REDISCLI_AUTH="$VALKEY_PASSWORD" valkey-cli -h 127.0.0.1 -p 26379 ping | grep -qx PONG',
+                  ]
+              periodSeconds: 5
+              timeoutSeconds: 5
+              failureThreshold: 60
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command:
+                  [
+                    "/bin/sh",
+                    "-ec",
+                    'REDISCLI_AUTH="$VALKEY_PASSWORD" valkey-cli -h 127.0.0.1 -p 26379 ping | grep -qx PONG',
+                  ]
+              periodSeconds: 5
+              timeoutSeconds: 5
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command:
+                  [
+                    "/bin/sh",
+                    "-ec",
+                    'REDISCLI_AUTH="$VALKEY_PASSWORD" valkey-cli -h 127.0.0.1 -p 26379 ping | grep -qx PONG',
+                  ]
+              periodSeconds: 30
+              timeoutSeconds: 5
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi
+
+service:
+  main:
+    forceRename: authelia
+    controller: main
+    annotations:
+      gatus.home-operations.com/enabled: "true"
+      gatus.home-operations.com/endpoint: |
+        name: Authelia health
+        group: Identity
+        url: http://authelia.authelia.svc.cluster.local:9091/api/health
+        interval: 1m
+        client:
+          ignore-redirect: true
+          timeout: 10s
+        conditions:
+          - "[STATUS] == 200"
+          - "[BODY].status == OK"
+        alerts:
+          - type: discord
+    ports:
+      http:
+        port: 9091
+
+  valkey:
+    forceRename: authelia-valkey
+    controller: valkey
+    clusterIP: None
+    publishNotReadyAddresses: true
+    ports:
+      valkey:
+        port: 6379
+      sentinel:
+        port: 26379
+
+listenerSets:
+  external:
+    labels:
+      gateway-role: external
+    parentRef:
+      name: external
+      namespace: traefik-external
+    listeners:
+      - name: https
+        hostname: auth.${BASE_DOMAIN}
+        port: 8443
+        protocol: HTTPS
+        tls:
+          certificateRefs:
+            - name: authelia-gateway-tls
+
+route:
+  main:
+    forceRename: authelia
+    kind: HTTPRoute
+    labels:
+      gateway-role: external
+    annotations:
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/name: "Authelia"
+      gethomepage.dev/group: "Auth"
+      gethomepage.dev/icon: "authelia.svg"
+      gethomepage.dev/href: "https://auth.${BASE_DOMAIN}"
+      gethomepage.dev/weight: "10"
+      gethomepage.dev/app: "authelia"
+    hostnames:
+      - auth.${BASE_DOMAIN}
+    parentRefs:
+      # cloudflared's listener. LAN DNS and Gatus also need a Gateway parent.
+      - name: external
+        namespace: traefik-external
+        sectionName: tunnel
+      - identifier: external
+        sectionName: https
+    rules:
+      - backendRefs:
+          - identifier: main
+            port: http
+
+persistence:
+  config:
+    type: configMap
+    name: authelia-configfile
+    advancedMounts:
+      main:
+        main:
+          - path: /config/configuration.yaml
+            subPath: configuration.yaml
+            readOnly: true
+
+  secrets:
+    type: secret
+    name: authelia-secret
+    advancedMounts:
+      main:
+        main:
+          - path: /config/secret
+            readOnly: true
+
+  env-secrets:
+    type: secret
+    name: authelia-env-secret
+    advancedMounts:
+      main:
+        main:
+          - path: /config/env
+            readOnly: true
+
+  ldap-service-account:
+    type: secret
+    name: lldap-service-account
+    advancedMounts:
+      main:
+        main:
+          - path: /config/ldap
+            readOnly: true
+
+  storage-key:
+    type: secret
+    name: authelia-storage-key
+    advancedMounts:
+      main:
+        main:
+          - path: /config/storage-key
+            readOnly: true
+
+  session-secrets:
+    type: secret
+    name: authelia-session
+    advancedMounts:
+      main:
+        main:
+          - path: /config/session
+            readOnly: true
+
+  oidc-clients:
+    type: secret
+    name: authelia-oidc-clients
+    advancedMounts:
+      main:
+        main:
+          - path: /config/oidc-clients
+            readOnly: true
+
+  postgres-credentials:
+    type: secret
+    name: authelia-postgres-app
+    advancedMounts:
+      main:
+        main:
+          - path: /config/cnpg
+            readOnly: true
+
+  valkey-credentials:
+    type: secret
+    name: authelia-valkey
+    advancedMounts:
+      main:
+        main:
+          - path: /config/valkey
+            readOnly: true
+
+  valkey-scripts:
+    type: configMap
+    name: authelia-valkey-scripts
+    advancedMounts:
+      valkey:
+        valkey:
+          - path: /scripts
+            readOnly: true
+        sentinel:
+          - path: /scripts
+            readOnly: true
+
+  valkey-data:
+    type: emptyDir
+    advancedMounts:
+      valkey:
+        valkey:
+          - path: /data
+        sentinel:
+          - path: /data

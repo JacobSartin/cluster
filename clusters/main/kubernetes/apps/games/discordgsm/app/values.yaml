@@ -1,0 +1,81 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+controllers:
+  main:
+    forceRename: discordgsm
+    strategy: Recreate
+    pod:
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+    containers:
+      main:
+        image:
+          repository: docker.io/discordgsm/discord-game-server-monitor
+          tag: 2.20.1@sha256:c50826cb218cbd87e304e429bbf3a7272e7ee8ab84f1ea2c6ed3e036ffb942f4
+
+        command:
+          - python
+          - main.py
+        env:
+          TZ: ${TZ}
+          HOME: /usr/src/app/data
+          APP_TOKEN:
+            valueFrom:
+              secretKeyRef:
+                name: discordgsm-credentials
+                key: token
+          WHITELIST_GUILDS: "${DISCORD_SERVER_ID}"
+          FACTORIO_USERNAME:
+            valueFrom:
+              secretKeyRef:
+                name: discordgsm-credentials
+                key: factorio-username
+          FACTORIO_TOKEN:
+            valueFrom:
+              secretKeyRef:
+                name: discordgsm-credentials
+                key: factorio-token
+
+        probes:
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command:
+                  - python
+                  - -c
+                  - "import os; from pathlib import Path; assert b'main.py' in Path('/proc/1/cmdline').read_bytes() and os.access('/usr/src/app/data', os.W_OK)"
+              periodSeconds: 10
+              failureThreshold: 3
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 25m
+            memory: 128Mi
+          limits:
+            memory: 1Gi
+
+persistence:
+  data:
+    existingClaim: discordgsm-data
+    globalMounts:
+      - path: /usr/src/app/data
+
+  tmp:
+    type: emptyDir
+    globalMounts:
+      - path: /tmp

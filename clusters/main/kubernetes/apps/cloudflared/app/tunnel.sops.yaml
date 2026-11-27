@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: cloudflared-tunnel
+    namespace: cloudflared
+type: Opaque
+stringData:
+    tunnelToken: ENC[AES256_GCM,data:Bh9dFs6GiBOdWR7uB6ao6mdbJjqpNvxteD6UeqFH4sUABNQ9G3+HcYR0uYSMNl4Sw3MOImP4aGlPG7S3v9yQ5HCC+LMeK18JUXxcJjeFWgPjPY3WHEzkS0ZTKAQwoCcnzgXBIywq0Vc4uneNCoqPoqJ35hSBgXyIuo9uy1F14vxKQ2dDWXbvWJiiW0p9x9053tSwrRryvUqZyFyjmi43WMFoDiZlYVEy5NBUnKKjJl0t1y+d,iv:DnhhDMB1yP9CaZzc+AujE24fllRrmmZXo1D3BoA07fk=,tag:B3gfIRNjCaTUw3QS/dg6rg==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBVekxvUjVUdkZlNUJGb2Fi
+            WUxJQUR1S3JGUkdBY1pkZDh0ajR0dld0NXdBCnFwdHNPR3N5MkFzeHVHWEdSV3E2
+            MDNKS1Y1dkNDSUYvbnV4eHp2anE0dUkKLS0tIC9qa0puaUNzd0JqTkhHMTN6dlls
+            K0hGczhTMDA3ZzZza1M0UUpHT0dvc1UKIMgFq21AxdiI4QNfTMSuAGN0AkJmbfrN
+            nYiaW3Gi1Wml0GhU1MH3u2lHfGP7tIFgw52w7zEEFTl805BoLrubFg==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1tpc0yytufplgg0gucz7ze52vhx0c0j6lvzctmy0kfg4fhyy444gqedj494
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlc0FOajI2VnhLY3NYRlp0
+            ZjZEMFBMam4wczFTR24vUHlBUDJKWnNqdTJVClFaZjhTeG9rVVBxT1ZRai85enVU
+            aXRZc0FvSDl1bkFiMlZsUGtFYjNyMU0KLS0tIHJtOGxkcnJjL2c0TnRJN3lNaVF0
+            QjUzVFFOMHpLZUdSbHUxSmZOY01td28K045TBjrK6M0URm104m4gUVhKQDdzK7EO
+            g0aAjig1GCaFuengTCim50iTfwhCiuChWreDi4UprrFwKY/pi6ok5A==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1h8c7nenuf7rn6qjmackxrlt3nvjfyk77mw7ujnrsnnspkcle8s7qjsamhs
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-10-13T22:29:20Z"
+    mac: ENC[AES256_GCM,data:EcvN7vkQ8lVtP5P2yCaegVjGohnFsrpZ4LJSMljnO5WRb82BtVlFrXMIu35TpqlstvuqpUQLcEkvbBTGtoXhQQLBBY3cBsO4vI7vxqftgU7WK+s532ig+n9XFwVmhiKGALebooEkgJOONGp/sYjMuPA/h/7YYd1PKXNJg85YNuk=,iv:F/Uvra4xndubA4ok6Hw3APEeLTGQF0IBw5ydFTKREII=,tag:ZDt7VTgPuCOZDkaqZLGZeA==,type:str]
+    mac_only_encrypted: true
+    version: 3.13.3

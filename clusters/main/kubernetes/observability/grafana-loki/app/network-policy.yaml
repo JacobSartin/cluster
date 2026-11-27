@@ -1,0 +1,57 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumnetworkpolicy_v2.json
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: loki-ingress
+  namespace: grafana-loki
+
+specs:
+  - description: Loki components to each other
+    endpointSelector: {}
+    ingress:
+      - fromEndpoints:
+          - {}
+  - description: Alloy and unpoller push, Grafana queries, all through the gateway
+    endpointSelector:
+      matchLabels:
+        app.kubernetes.io/component: gateway
+    ingress:
+      - fromEndpoints:
+          - matchLabels:
+              k8s:io.kubernetes.pod.namespace: grafana-alloy
+              app.kubernetes.io/name: alloy
+          - matchLabels:
+              k8s:io.kubernetes.pod.namespace: unpoller
+              app.kubernetes.io/name: unpoller
+          - matchLabels:
+              k8s:io.kubernetes.pod.namespace: grafana-operator
+              app: grafana
+        toPorts:
+          - ports:
+              - port: "8080"
+                protocol: TCP
+  - description: Prometheus scrapes every component and the gateway exporter
+    endpointSelector: {}
+    ingress:
+      - fromEndpoints:
+          - matchLabels:
+              k8s:io.kubernetes.pod.namespace: kube-prometheus-stack
+              app.kubernetes.io/name: prometheus
+        toPorts:
+          - ports:
+              - port: "3100"
+                protocol: TCP
+              - port: "4040"
+                protocol: TCP
+  - description: Agent reads through the API server proxy (agent-rbac.yaml)
+    endpointSelector:
+      matchLabels:
+        app.kubernetes.io/component: single-binary
+    ingress:
+      - fromEntities:
+          - kube-apiserver
+        toPorts:
+          - ports:
+              - port: "3100"
+                protocol: TCP

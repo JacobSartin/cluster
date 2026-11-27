@@ -1,0 +1,35 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  customDatasources: {
+    "prometheus-operator-charts": {
+      defaultRegistryUrlTemplate: "https://prometheus-community.github.io/helm-charts/index.yaml",
+      format: "yaml",
+      transformTemplates: [
+        // The index uses the bare chart name.
+        '($stable := function($charts) { $charts[$not(deprecated = true) and $exists($match(version, /^[0-9]+\\.[0-9]+\\.[0-9]+$/)) and $exists($match(appVersion, /^v?[0-9]+\\.[0-9]+\\.[0-9]+$/))] }; $stack := $stable(entries."kube-prometheus-stack"); $crds := $stable(entries."prometheus-operator-crds"); $operators := $distinct($stack.$replace(appVersion, /^v/, ""))[$ in $crds.$replace(appVersion, /^v/, "")]; $latest := ($operators^(>$number($split($, ".")[0]), >$number($split($, ".")[1]), >$number($split($, ".")[2])))[0]; $chart := $split("{{{packageName}}}", "/")[-1]; {"releases": [$stable($lookup(entries, $chart))[$exists($latest) and $replace(appVersion, /^v/, "") = $latest].{"version": version, "releaseTimestamp": created}], "sourceUrl": "https://github.com/prometheus-community/helm-charts"})',
+      ],
+    },
+  },
+  packageRules: [
+    {
+      description: "Pair Prometheus charts using their shared Operator appVersion",
+      matchManagers: ["flux"],
+      matchDatasources: ["docker"],
+      matchPackageNames: [
+        "ghcr.io/prometheus-community/charts/kube-prometheus-stack",
+        "ghcr.io/prometheus-community/charts/prometheus-operator-crds",
+      ],
+      overrideDatasource: "custom.prometheus-operator-charts",
+      registryUrls: ["https://prometheus-community.github.io/helm-charts/index.yaml"],
+      versioning: "helm",
+      groupName: "prometheus-operator charts",
+      groupSlug: "prometheus-operator-charts",
+      separateMajorMinor: false,
+      separateMinorPatch: false,
+      separateMultipleMajor: false,
+      separateMultipleMinor: false,
+      // A chart-only patch can update one member without changing the Operator.
+      minimumGroupSize: 1,
+    },
+  ],
+}

@@ -1,0 +1,48 @@
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: dns
+  namespace: metallb
+spec:
+  addresses:
+    - ${METALLB_POOL_DNS}
+  autoAssign: false
+  serviceAllocation:
+    namespaceSelectors:
+      - matchLabels:
+          kubernetes.io/metadata.name: blocky
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: games
+  namespace: metallb
+spec:
+  addresses:
+    - ${METALLB_POOL_GAMES}
+  autoAssign: false
+  serviceAllocation:
+    namespaceSelectors:
+      - matchExpressions:
+          - key: kubernetes.io/metadata.name
+            operator: In
+            values:
+              - assettocorsa
+              - cs2
+              - factorio
+              - minecraft
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: private
+  namespace: metallb
+spec:
+  addresses:
+    - ${METALLB_POOL_PRIVATE}
+  autoAssign: false
+  serviceAllocation:
+    namespaceSelectors:
+      - matchLabels:
+          capsule.clastix.io/tenant: private

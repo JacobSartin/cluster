@@ -1,0 +1,20 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: lldap
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cloudnative-pg-barman-plugin
+    - name: cloudnative-pg-image-catalog
+    - name: external-secrets
+    - name: external-secrets-stores
+    - name: prometheus-operator-crds
+    - name: gateway-api-crds
+    - name: longhorn
+  interval: 10m
+  path: clusters/main/kubernetes/core/auth/lldap/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster

@@ -1,0 +1,232 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  main:
+    forceRename: static-web-server
+    annotations:
+      configmap.reloader.stakater.com/reload: static-web-server-config
+    strategy: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    pod:
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+        supplementalGroups:
+          - 568
+    initContainers:
+      git-sync:
+        image:
+          repository: registry.k8s.io/git-sync/git-sync
+          tag: v4.8.0@sha256:a20644562fba94773e594885cb001aadb5a3172175f13ac1215e5b2033c9200e
+
+        restartPolicy: Always
+
+        args:
+          - --repo=https://github.com/JacobSartin/jacobsartin.com
+          - --ref=site
+          - --root=/git
+          - --link=current
+          - --period=60s
+          - --max-failures=5
+          # git-sync requires trust for the root-owned emptyDir.
+          - --git-config=safe.directory:*
+          - --http-bind=:8081
+
+        env:
+          HOME: /tmp
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 8081
+              periodSeconds: 2
+              failureThreshold: 150
+              timeoutSeconds: 3
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 8081
+              periodSeconds: 30
+              failureThreshold: 3
+              timeoutSeconds: 5
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 256Mi
+
+    containers:
+      main:
+        image:
+          repository: ghcr.io/static-web-server/static-web-server
+          tag: 2.44.3@sha256:ccf2d666ffe5f8ef2ec96bc40f07757605998c04b78f7d8fdb98a584dd4f5717
+
+        env:
+          TZ: ${TZ}
+          SERVER_PORT: "38080"
+          SERVER_ROOT: /git/current
+          SERVER_USE_RELATIVE_ROOT: "true"
+          # Exclude the worktree's .git file from served content.
+          SERVER_IGNORE_HIDDEN_FILES: "true"
+          SERVER_CONFIG_FILE: /etc/static-web-server/sws.toml
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 38080
+              initialDelaySeconds: 10
+              periodSeconds: 5
+              failureThreshold: 60
+              timeoutSeconds: 3
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 38080
+              initialDelaySeconds: 10
+              periodSeconds: 12
+              failureThreshold: 4
+              successThreshold: 2
+              timeoutSeconds: 5
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 38080
+              initialDelaySeconds: 12
+              periodSeconds: 15
+              failureThreshold: 5
+              timeoutSeconds: 5
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 75m
+            memory: 200Mi
+          limits:
+            cpu: 1500m
+            memory: 2400Mi
+
+service:
+  main:
+    forceRename: static-web-server
+    controller: main
+    ports:
+      main:
+        port: 38080
+
+listenerSets:
+  external:
+    labels:
+      gateway-role: external
+    parentRef:
+      name: external
+      namespace: traefik-external
+    listeners:
+      - name: apex
+        hostname: ${BASE_DOMAIN}
+        port: 8443
+        protocol: HTTPS
+        tls:
+          certificateRefs:
+            - name: static-web-server-gateway-tls
+      - name: www
+        hostname: www.${BASE_DOMAIN}
+        port: 8443
+        protocol: HTTPS
+        tls:
+          certificateRefs:
+            - name: static-web-server-gateway-tls
+
+route:
+  main:
+    forceRename: static-web-server
+    kind: HTTPRoute
+    labels:
+      gateway-role: external
+    annotations:
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/name: "Website"
+      gethomepage.dev/group: "Tools"
+      gethomepage.dev/icon: "mdi-web"
+      gethomepage.dev/href: "https://${BASE_DOMAIN}"
+      gethomepage.dev/weight: "70"
+    hostnames:
+      - ${BASE_DOMAIN}
+      - www.${BASE_DOMAIN}
+    parentRefs:
+      # cloudflared's listener. LAN DNS and Gatus also need a Gateway parent.
+      - name: external
+        namespace: traefik-external
+        sectionName: tunnel
+      - identifier: external
+    rules:
+      - backendRefs:
+          - identifier: main
+            port: main
+
+persistence:
+  git:
+    type: emptyDir
+    sizeLimit: 512Mi
+    advancedMounts:
+      main:
+        main:
+          - path: /git
+            readOnly: true
+        git-sync:
+          - path: /git
+
+  sws-config:
+    type: configMap
+    name: static-web-server-config
+    advancedMounts:
+      main:
+        main:
+          - path: /etc/static-web-server
+            readOnly: true
+
+  tmp:
+    type: emptyDir
+    globalMounts:
+      - path: /tmp

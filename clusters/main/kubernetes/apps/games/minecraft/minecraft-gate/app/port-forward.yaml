@@ -1,0 +1,27 @@
+---
+# Use separate rules; the upstream "both" protocol is unsupported.
+apiVersion: unifi-port-forward.fiskhe.st/v1alpha1
+kind: PortForwardRule
+metadata:
+  name: minecraft-gate-wan-tcp
+  namespace: minecraft
+spec:
+  description: Minecraft Java through Gate
+  externalPort: 25565
+  protocol: tcp
+  serviceRef:
+    name: minecraft-gate
+    port: main
+---
+apiVersion: unifi-port-forward.fiskhe.st/v1alpha1
+kind: PortForwardRule
+metadata:
+  name: minecraft-gate-wan-udp
+  namespace: minecraft
+spec:
+  description: Minecraft server-list query through Gate
+  externalPort: 25565
+  protocol: udp
+  serviceRef:
+    name: minecraft-gate
+    port: query

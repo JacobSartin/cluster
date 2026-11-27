@@ -1,0 +1,68 @@
+#!/usr/bin/env sh
+# Decrypted view with "#! sops" after each value encrypted in Git; plaintext is flagged.
+set -eu
+export SOPSDIFFER_FILE="$1"
+
+# The file as stored, flagging non-empty data/stringData values that are not ENC[...].
+stored() {
+  awk '
+    function indent(s) { match(s, /^ */); return RLENGTH }
+    { sub(/\r$/, "") }
+    /^[^ #-]/ { top = $0; sub(/:.*/, "", top) }
+    (top == "data" || top == "stringData") && indent($0) > 0 && /^ +[^ #][^:]*: *[^ ]/ &&
+      !/ENC\[AES256_GCM,/ && !/: *(""|\047\047) *$/ { print $0 "  #! PLAINTEXT IN GIT"; next }
+    { print }
+  ' "$SOPSDIFFER_FILE"
+}
+
+if ! grep -q '^sops:' "$SOPSDIFFER_FILE"; then
+  echo '#! sopsdiffer: NOT ENCRYPTED, no sops metadata; this is the file as stored in Git'
+  stored
+  exit 0
+fi
+
+if ! plain=$(sops decrypt "$SOPSDIFFER_FILE" 2>/dev/null); then
+  case $(sops decrypt "$SOPSDIFFER_FILE" 2>&1 >/dev/null || true) in
+    *"Could not decrypt value"*) why='a value is not encrypted' ;;
+    *"Failed to get the data key"*) why='no key that opens it' ;;
+    *) why='sops failed' ;;
+  esac
+  echo "#! sopsdiffer: NOT DECRYPTED ($why); this is the file as stored in Git"
+  stored
+  exit 0
+fi
+
+# Matches the stored file, minus its sops blocks, line for line; an ENC[...] value may
+# decrypt to several lines. Any other difference prints the decrypted file unmarked.
+printf '%s\n' "$plain" | awk '
+  function indent(s) { match(s, /^ */); return RLENGTH }
+  BEGIN {
+    while ((getline line < ENVIRON["SOPSDIFFER_FILE"]) > 0) {
+      sub(/\r$/, "", line)
+      if (line ~ /^sops:/) meta = 1
+      else if (line ~ /^---/) meta = 0
+      if (!meta) stored[++n] = line
+    }
+  }
+  { sub(/\r$/, ""); plain[++m] = $0 }
+  END {
+    i = 1; ok = 1
+    for (j = 1; j <= m && ok; ) {
+      if (i > n) ok = 0
+      else if (index(stored[i], "ENC[AES256_GCM,")) {
+        if (stored[i] !~ /^ *#ENC/) count++
+        k = indent(stored[i]); out[++o] = plain[j++] "  #! sops"
+        while (j <= m && (indent(plain[j]) > k || (plain[j] == "" && j < m && indent(plain[j + 1]) > k))) out[++o] = plain[j++]
+        i++
+      } else if (stored[i] == plain[j]) {
+        out[++o] = plain[j++]; i++
+      } else ok = 0
+    }
+    if (!ok || i <= n) {
+      print "#! sopsdiffer: decrypted by sops (values not marked: the stored layout differs from sops output)"
+      for (j = 1; j <= m; j++) print plain[j]
+      exit
+    }
+    printf "#! sopsdiffer: decrypted by sops; \"#! sops\" marks the %d values encrypted in Git\n", count
+    for (x = 1; x <= o; x++) print out[x]
+  }'

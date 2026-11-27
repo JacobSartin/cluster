@@ -1,0 +1,8 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  flux: {
+    // The built-in pattern only covers gotk-components.yaml.
+    managerFilePatterns: ["/(^|/)(apps|clusters|repositories)/.+\\.ya?ml$/"],
+    pinDigests: false,
+  },
+}

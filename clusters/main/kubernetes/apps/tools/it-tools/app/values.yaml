@@ -1,0 +1,105 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  main:
+    forceRename: it-tools
+
+    pod:
+      securityContext:
+        fsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
+        supplementalGroups:
+          - 101
+
+    containers:
+      main:
+        image:
+          repository: ghcr.io/sharevb/it-tools
+          tag: 2026.11.22@sha256:bcbb29086ca71f1ff23c7dc061f8c9b6e50f1267b4dc704327bb29ba55a8b87d
+
+        env:
+          TZ: ${TZ}
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 8080
+              failureThreshold: 30
+              periodSeconds: 5
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 8080
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 8080
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 101
+          runAsNonRoot: true
+          runAsUser: 101
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 256Mi
+
+service:
+  main:
+    forceRename: it-tools
+    controller: main
+    ports:
+      main:
+        port: 18082
+        targetPort: 8080
+
+route:
+  main:
+    kind: HTTPRoute
+    labels:
+      gateway-role: internal
+    annotations:
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/name: "IT Tools"
+      gethomepage.dev/group: "Tools"
+      gethomepage.dev/icon: "it-tools.svg"
+      gethomepage.dev/href: "https://tools.${BASE_DOMAIN}"
+      gethomepage.dev/weight: "10"
+    hostnames:
+      - tools.${BASE_DOMAIN}
+    parentRefs:
+      - name: internal
+        namespace: traefik-internal
+        sectionName: websecure
+    rules:
+      - backendRefs:
+          - identifier: main
+            port: 18082
+
+persistence:
+  config:
+    type: emptyDir
+
+  tmp:
+    type: emptyDir

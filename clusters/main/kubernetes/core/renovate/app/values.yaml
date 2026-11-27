@@ -1,0 +1,107 @@
+fullnameOverride: renovate
+
+renovate:
+  mendRnvPlatform: github
+  mendRnvAcceptTos: "y"
+  existingSecret: renovate-credentials
+  mendRnvCronJobSchedulerAll: "17 * * * *"
+  mendRnvCronAppSync: "0 * * * *"
+  mendRnvSyncOnStartup: "true"
+  mendRnvEnqueueJobsOnStartup: discovered
+  mendRnvSqliteFilePath: /tmp/renovate/renovate-ce.sqlite
+  mendRnvLogHistoryDir: /tmp/renovate/logs
+  mendRnvLogHistoryTTLDays: "14"
+  mendRnvDatabaseHistoryTTLDays: "120"
+  mendRnvDiskUsageWarnThreshold: "85"
+  mendRnvApiEnabled: "true"
+  mendRnvSystemApiEnabled: "true"
+  mendRnvJobsApiEnabled: "true"
+  logLevel: info
+  logFormat: json
+  extraEnvVars:
+    - name: TZ
+      value: ${TZ}
+    - name: MEND_RNV_GITHUB_PEM_FILE_PATH
+      value: /secrets/private-key.pem
+    - name: MEND_RNV_WEBHOOK_SKIP_SIGNATURE_VERIFICATION
+      value: "false"
+  config: |
+    module.exports = {
+      onboarding: false,
+      requireConfig: 'required',
+      baseDir: '/tmp/renovate/repos',
+      cacheDir: '/tmp/renovate/cache',
+      binarySource: 'global',
+      cachePrivatePackages: true,
+      presetCachePersistence: true,
+      repositoryCache: 'enabled',
+      persistRepoData: true,
+    };
+
+cachePersistence:
+  enabled: true
+  existingClaim: renovate-cache
+
+service:
+  type: ClusterIP
+  ports:
+    http: 80
+ingress:
+  enabled: false
+
+annotations:
+  reloader.stakater.com/auto: "true"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 12021
+  runAsGroup: 12021
+  fsGroup: 12021
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 1Gi
+  limits:
+    memory: 4Gi
+
+# Allow for Renovate CE's SIGTERM timeout.
+terminationGracePeriodSeconds: 15
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+livenessProbe:
+  initialDelaySeconds: 60
+  httpGet:
+    path: /health
+    port: http
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 5
+
+extraVolumes:
+  - name: github-app-key
+    secret:
+      secretName: renovate-credentials
+      defaultMode: 0440
+      items:
+        - key: private-key.pem
+          path: private-key.pem
+
+extraVolumeMounts:
+  - name: github-app-key
+    mountPath: /secrets
+    readOnly: true

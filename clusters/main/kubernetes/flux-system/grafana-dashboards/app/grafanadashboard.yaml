@@ -1,0 +1,34 @@
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: flux-performance
+  namespace: flux-system
+spec:
+  allowCrossNamespaceImport: true
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: prometheus
+  # renovate-dashboard: depName=controlplaneio-fluxcd/flux-operator datasource=github-releases
+  url: https://raw.githubusercontent.com/controlplaneio-fluxcd/flux-operator/v0.64.0/config/monitoring/dashboards/flux-performance.json
+  folder: Infrastructure
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: flux-k8s-api-performance
+  namespace: flux-system
+spec:
+  allowCrossNamespaceImport: true
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: prometheus
+  # renovate-dashboard: depName=controlplaneio-fluxcd/flux-operator datasource=github-releases
+  url: https://raw.githubusercontent.com/controlplaneio-fluxcd/flux-operator/v0.64.0/config/monitoring/dashboards/flux-k8s-api-performance.json
+  folder: Infrastructure

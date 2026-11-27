@@ -1,0 +1,38 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cloudnative-pg
+  namespace: cloudnative-pg
+spec:
+  interval: 5m
+  chartRef:
+    kind: OCIRepository
+    name: cloudnative-pg
+    namespace: flux-system
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    crds:
+      create: true
+    replicaCount: 2
+    updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 0
+        maxUnavailable: 1
+    resources:
+      requests:
+        cpu: 10m
+        memory: 160Mi
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: cloudnative-pg
+                app.kubernetes.io/name: cloudnative-pg
+            topologyKey: kubernetes.io/hostname
+    monitoring:
+      podMonitorEnabled: true

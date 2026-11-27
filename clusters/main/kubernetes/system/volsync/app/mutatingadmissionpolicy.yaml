@@ -1,0 +1,66 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/v1.36.0/mutatingadmissionpolicy-admissionregistration-v1.json
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: volsync-source-schedule
+spec:
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - volsync.backube
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - replicationsources
+  matchConditions:
+    - name: uses-default-midnight-schedule
+      expression: >-
+        has(object.spec.trigger) &&
+        has(object.spec.trigger.schedule) &&
+        object.spec.trigger.schedule == "0 0 * * *"
+    - name: schedule-management-not-disabled
+      expression: >-
+        object.metadata.?labels["volsync.backube/schedule-managed"].orValue("true") != "false"
+  failurePolicy: Fail
+  reinvocationPolicy: IfNeeded
+  variables:
+    - name: key
+      expression: >-
+        (object.metadata.namespace + "/" + object.metadata.name).lowerAscii()
+    - name: alphabet
+      expression: >-
+        "abcdefghijklmnopqrstuvwxyz0123456789-/"
+    - name: offset
+      expression: >-
+        (
+          variables.key.size() * 43 +
+          variables.alphabet.indexOf(variables.key.charAt(0)) * 37 +
+          variables.alphabet.indexOf(variables.key.charAt(1)) * 71 +
+          variables.alphabet.indexOf(variables.key.charAt(variables.key.size() / 4)) * 61 +
+          variables.alphabet.indexOf(variables.key.charAt(variables.key.size() / 2)) * 79 +
+          variables.alphabet.indexOf(variables.key.charAt(variables.key.size() * 3 / 4)) * 89 +
+          variables.alphabet.indexOf(variables.key.charAt(variables.key.size() - 2)) * 67 +
+          variables.alphabet.indexOf(variables.key.charAt(variables.key.size() - 1)) * 41
+        ) % 120
+  mutations:
+    - patchType: JSONPatch
+      jsonPatch:
+        expression: >-
+          [JSONPatch{
+            op: "replace",
+            path: "/spec/trigger/schedule",
+            value: string(variables.offset % 60) + " " +
+              string(variables.offset / 60) + " * * *"
+          }]
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/v1.36.0/mutatingadmissionpolicybinding-admissionregistration-v1.json
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: volsync-source-schedule
+spec:
+  policyName: volsync-source-schedule

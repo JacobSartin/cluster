@@ -1,0 +1,103 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cloudnative-pg-backups
+  namespace: cloudnative-pg
+spec:
+  groups:
+    - name: cloudnative-pg-backups
+      rules:
+        - record: cnpg:barman_last_available_backup_timestamp:max
+          expr: |
+            max by (namespace, cluster) (
+              label_replace(barman_cloud_cloudnative_pg_io_last_available_backup_timestamp, "cluster", "$1", "pod", "(.+)-[0-9]+")
+            )
+
+        - record: cnpg:barman_last_failed_backup_timestamp:max
+          expr: |
+            max by (namespace, cluster) (
+              label_replace(barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp, "cluster", "$1", "pod", "(.+)-[0-9]+")
+            )
+
+        - alert: CNPGBackupMissed
+          expr: time() - cnpg:barman_last_available_backup_timestamp:max > 36 * 3600
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'CNPG Cluster {{ $labels.namespace }}/{{ $labels.cluster }} has no backup from the last 36 hours'
+            description: 'The newest available base backup is {{ $value | humanizeDuration }} old, so the daily ScheduledBackup has missed a run. Check the Backup objects and the plugin-barman-cloud container logs.'
+
+        - alert: CNPGBackupFailed
+          expr: cnpg:barman_last_failed_backup_timestamp:max > cnpg:barman_last_available_backup_timestamp:max
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'The latest backup of CNPG Cluster {{ $labels.namespace }}/{{ $labels.cluster }} failed'
+            description: 'A backup failed after the newest available one. Check the failed Backup object and the plugin-barman-cloud container logs.'
+
+        - alert: CNPGWALArchivingStalled
+          expr: max by (namespace, pod) (cnpg_collector_pg_wal_archive_status{value="ready"}) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'CNPG instance {{ $labels.namespace }}/{{ $labels.pod }} has WAL waiting to be archived'
+            description: '{{ $value }} WAL segments have waited more than 15 minutes to be archived, so the archive is falling behind the database. Check the plugin-barman-cloud container logs; a stuck archiver recovers after a rolling restart of the Cluster.'
+
+        - alert: CNPGBackupNearExpiry
+          expr: time() - cnpg:barman_last_available_backup_timestamp:max > 14 * 86400
+          for: 30m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'CNPG Cluster {{ $labels.namespace }}/{{ $labels.cluster }} has had no backup for two weeks'
+            description: 'The newest available base backup is {{ $value | humanizeDuration }} old. The backup bucket expires objects 60 days after they are written, which would eventually delete this last good backup. Restore daily backups before then.'
+    - name: cloudnative-pg-clusters
+      rules:
+        - alert: CNPGReplicaNotStreaming
+          expr: cnpg_pg_replication_in_recovery == 1 and cnpg_pg_replication_is_wal_receiver_up == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'CNPG replica {{ $labels.namespace }}/{{ $labels.pod }} is not streaming from its primary'
+            description: The instance is in recovery but its WAL receiver has been down for 10 minutes, so the replica falls behind and a failover would lose data. Check the Cluster status and the replica logs.
+
+        - alert: CNPGReplicationLagHigh
+          expr: cnpg_pg_replication_lag > 300
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'CNPG replica {{ $labels.namespace }}/{{ $labels.pod }} lags {{ $value | humanizeDuration }} behind its primary'
+            description: The replica has been more than five minutes behind for 10 minutes. Check network and disk pressure on its node.
+
+        - alert: CNPGTransactionIDAgeHigh
+          expr: max by (namespace, pod, datname) (cnpg_pg_database_xid_age) > 300000000
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Database {{ $labels.datname }} on {{ $labels.namespace }}/{{ $labels.pod }} has a transaction ID age of {{ $value | humanize }}'
+            description: autovacuum is not freezing old rows. Look for a long-running transaction, a stale replication slot or a disabled autovacuum.
+
+        - alert: CNPGManualSwitchoverRequired
+          expr: cnpg_collector_manual_switchover_required == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'CNPG instance {{ $labels.namespace }}/{{ $labels.pod }} needs a manual switchover'
+            description: The operator cannot promote on its own, usually after a failed in-place upgrade. Follow the CNPG runbook for a manual switchover.
+
+        - alert: CNPGCollectorErrors
+          expr: cnpg_collector_last_collection_error == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'CNPG metrics collection fails on {{ $labels.namespace }}/{{ $labels.pod }}'
+            description: The last metrics collection returned an error for 15 minutes, so the other CNPG alerts may be blind. Check the instance logs for the failing query.

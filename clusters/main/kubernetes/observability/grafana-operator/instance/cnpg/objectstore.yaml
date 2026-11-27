@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/barmancloud.cnpg.io/objectstore_v1.json
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: grafana-rustfs
+  namespace: grafana-operator
+spec:
+  configuration:
+    destinationPath: s3://${S3BUCKET}-grafana-operator/grafana-operator/cnpg
+    s3Credentials:
+      accessKeyId:
+        name: grafana-postgres-rustfs
+      secretAccessKey:
+        name: grafana-postgres-rustfs

@@ -1,0 +1,62 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: namespace-label-guard
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["namespaces"]
+  matchConditions:
+    - name: not-cluster-admin
+      expression: >-
+        !('system:masters' in request.userInfo.groups) &&
+        !(request.userInfo.username in [
+          'system:serviceaccount:flux-system:kustomize-controller',
+          'system:serviceaccount:flux-system:helm-controller',
+          'system:serviceaccount:flux-system:flux-operator'])
+  variables:
+    - name: prefixes
+      expression: "['pod-security.kubernetes.io/', 'network.jacobsartin.com/', 'auth.jacobsartin.com/']"
+    - name: tenantLabel
+      expression: "'capsule.clastix.io/tenant'"
+    - name: newLabels
+      expression: object.metadata.?labels.orValue({})
+    - name: oldLabels
+      expression: "request.operation == 'UPDATE' ? oldObject.metadata.?labels.orValue({}) : {}"
+    - name: changed
+      expression: >-
+        variables.newLabels.filter(k, variables.prefixes.exists(p, k.startsWith(p)) &&
+          (!(k in variables.oldLabels) || variables.oldLabels[k] != variables.newLabels[k])) +
+        variables.oldLabels.filter(k, variables.prefixes.exists(p, k.startsWith(p)) &&
+          !(k in variables.newLabels))
+    - name: privateOwned
+      expression: >-
+        request.userInfo.username == 'system:serviceaccount:private-system:flux' &&
+        variables.newLabels[?variables.tenantLabel].orValue('') == 'private' &&
+        (request.operation == 'CREATE' || variables.oldLabels[?variables.tenantLabel].orValue('') == 'private')
+    - name: privateValues
+      expression: >-
+        {'auth.jacobsartin.com/authelia': 'enabled', 'network.jacobsartin.com/egress': 'entry-point',
+         'network.jacobsartin.com/ingress': 'external', 'network.jacobsartin.com/lldap': 'client'}
+  validations:
+    - expression: >-
+        size(variables.changed) == 0 ||
+        (variables.privateOwned && variables.changed.all(k,
+          k.startsWith('pod-security.kubernetes.io/') ||
+          (k in variables.privateValues &&
+           (!(k in variables.newLabels) || variables.newLabels[k] == variables.privateValues[k]))))
+      messageExpression: >-
+        'only cluster admins may set these namespace labels: ' + variables.changed.join(', ')
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: namespace-label-guard
+spec:
+  policyName: namespace-label-guard
+  validationActions: [Deny]

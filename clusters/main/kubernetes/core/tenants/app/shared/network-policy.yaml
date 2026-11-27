@@ -1,0 +1,34 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumnetworkpolicy_v2.json
+# The namespace's entry-point label allows DNS and the internet; this adds the rest.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: shared-egress
+  namespace: shared
+
+specs:
+  - description: Pods within shared, such as an app and its Postgres cluster
+    endpointSelector: {}
+    egress:
+      - toEndpoints:
+          - {}
+  - description: CNPG instance managers and the Barman plugin sidecar watch the API server and back up to RustFS
+    endpointSelector:
+      matchExpressions:
+        - key: cnpg.io/cluster
+          operator: Exists
+    egress:
+      - toEntities:
+          - kube-apiserver
+        toPorts:
+          - ports:
+              - port: "6443"
+                protocol: TCP
+      # Keep the port literal; Flux substitution drops its YAML quotes.
+      - toCIDR:
+          - ${RUSTFS_URL%%:*}/32
+        toPorts:
+          - ports:
+              - port: "30292"
+                protocol: TCP

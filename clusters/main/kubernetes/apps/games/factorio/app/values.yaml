@@ -1,0 +1,126 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+controllers:
+  main:
+    forceRename: factorio
+    annotations:
+      configmap.reloader.stakater.com/reload: factorio-settings
+
+    replicas: 0
+
+    strategy: Recreate
+
+    pod:
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+    initContainers:
+      prepare-config:
+        image:
+          repository: docker.io/factoriotools/factorio
+          tag: 2.1.25-rootless@sha256:48569b7b8867578844bf41c558aed94d9dbe0ced03cfe711dfc6b6ca5dabf164
+
+        command: [/bin/sh, -ec]
+        args:
+          - cp /opt/factorio/config/config.ini /writable-config/config.ini
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+
+    containers:
+      main:
+        image:
+          repository: docker.io/factoriotools/factorio
+          tag: 2.1.25-rootless@sha256:48569b7b8867578844bf41c558aed94d9dbe0ced03cfe711dfc6b6ca5dabf164
+
+        command: [/bin/sh, -ec]
+        args:
+          - |
+            mkdir -p /factorio/config
+            cp /factorio-settings/server-settings.json /factorio/config/server-settings.json
+            exec /docker-entrypoint.sh
+
+        env:
+          TZ: ${TZ}
+          PORT: "34197"
+          SAVE_NAME: factory
+          GENERATE_NEW_SAVE: "true"
+          LOAD_LATEST_SAVE: "true"
+          DLC_SPACE_AGE: "false"
+          UPDATE_MODS_ON_START: "false"
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 4Gi
+
+service:
+  game:
+    controller: main
+    type: LoadBalancer
+    annotations:
+      metallb.io/address-pool: games
+      metallb.io/allow-shared-ip: games
+      unifi-port-forward.fiskhe.st/mapping: factorio
+    ports:
+      factorio:
+        port: 34197
+        protocol: UDP
+
+persistence:
+  data:
+    type: emptyDir
+    advancedMounts:
+      main:
+        main:
+          - path: /factorio
+
+  saves:
+    existingClaim: factorio-saves
+    advancedMounts:
+      main:
+        main:
+          - path: /factorio/saves
+
+  settings:
+    type: configMap
+    name: factorio-settings
+    advancedMounts:
+      main:
+        main:
+          - path: /factorio-settings
+            readOnly: true
+
+  config:
+    type: emptyDir
+    advancedMounts:
+      main:
+        prepare-config:
+          - path: /writable-config
+        main:
+          - path: /opt/factorio/config
+
+  tmp:
+    type: emptyDir
+    globalMounts:
+      - path: /tmp

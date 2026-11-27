@@ -1,0 +1,38 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: authelia
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cloudnative-pg-barman-plugin
+    - name: cloudnative-pg-image-catalog
+    - name: external-secrets
+    - name: external-secrets-stores
+    - name: prometheus-operator-crds
+    - name: longhorn
+    - name: traefik-external
+  interval: 10m
+  path: clusters/main/kubernetes/core/auth/authelia/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: authelia-oidc-clients
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: external-secrets
+    - name: homepage
+    - name: grafana-instance
+    - name: authelia
+  interval: 10m
+  path: clusters/main/kubernetes/core/auth/authelia/oidc-clients
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster

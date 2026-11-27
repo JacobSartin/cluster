@@ -1,0 +1,6 @@
+[tools]
+"github:JacobSartin/homelab-fmt" = "0.4.0"
+gitleaks = "8.30.1"
+
+[hooks]
+postinstall = "git config core.hooksPath .githooks && git config diff.sopsdiffer.textconv \"sh .githooks/sops-textconv\" && git config diff.sopsdiffer.xfuncname \"^(.*#! (sops|PLAINTEXT).*)$\""

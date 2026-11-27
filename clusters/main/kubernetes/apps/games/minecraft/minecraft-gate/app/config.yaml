@@ -1,0 +1,23 @@
+config:
+  bind: 0.0.0.0:25565
+  onlineMode: true
+  query:
+    enabled: true
+    port: 25565
+    showPlugins: false
+  lite:
+    enabled: true
+    routes:
+      - host:
+          - "mc.${BASE_DOMAIN}"
+          - "${BASE_DOMAIN}"
+        backend: minecraft-java.minecraft.svc.cluster.local:25565
+        tcpShieldRealIP: true
+        cachePingTTL: -1s
+        fallback:
+          motd: |
+            §cServer is offline.
+            §eCheck back later!
+          version:
+            name: "§cTry again later!"
+            protocol: -1

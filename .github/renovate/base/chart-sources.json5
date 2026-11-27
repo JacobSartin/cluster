@@ -1,0 +1,11 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  packageRules: [
+    {
+      description: "Read release notes for monorepo charts whose metadata points at the app repository",
+      matchDatasources: ["docker"],
+      matchPackageNames: ["ghcr.io/grafana-community/helm-charts/**"],
+      sourceUrl: "https://github.com/grafana-community/helm-charts",
+    },
+  ],
+}

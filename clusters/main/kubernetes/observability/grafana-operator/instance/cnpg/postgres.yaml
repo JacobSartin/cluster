@@ -1,0 +1,37 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: grafana-postgres
+  namespace: grafana-operator
+spec:
+  instances: 2
+  resources:
+    requests:
+      cpu: 25m
+      memory: 256Mi
+  affinity:
+    podAntiAffinityType: required
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-standard-trixie
+    major: 19
+  storage:
+    size: 5Gi
+  walStorage:
+    size: 10Gi
+  postgresql:
+    parameters:
+      max_slot_wal_keep_size: 5GB
+  # Recovery must archive under a new serverName.
+  bootstrap:
+    initdb:
+      database: grafana
+      owner: grafana
+  # Update serverName with the Postgres major.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: grafana-rustfs
+        serverName: grafana-postgres-pg19

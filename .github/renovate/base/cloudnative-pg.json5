@@ -1,0 +1,122 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  // A Cluster takes its Postgres major and Debian release from the upstream
+  // ClusterImageCatalog, so each is a field on the Cluster, one pull request per Cluster:
+  //
+  //   imageCatalogRef:
+  //     name: postgresql-standard-trixie   # Debian release
+  //     major: 16                          # Postgres major
+  //   ...
+  //   plugins:
+  //     - parameters:
+  //         serverName: lldap-postgres-pg16
+  //
+  // pg_upgrade starts a new system ID, so each major archives under a new serverName. The major
+  // and the serverName are two dependencies in one PR; an externalClusters serverName (the recovery
+  // source) moves with them. Merge a major PR and a Debian PR for the
+  // same Cluster one at a time: a major upgrade needs both images on the same Debian release.
+  //
+  // Each manager matches the whole block first, then only the line it rewrites: autoReplace
+  // templates only see depName and the version fields, not custom regex groups.
+  customManagers: [
+    {
+      customType: "regex",
+      description: "Propose a CNPG Cluster's next Postgres major, available on its current image type and Debian release",
+      managerFilePatterns: ["/(^|/)(apps|clusters)/.+\\.ya?ml$/"],
+      matchStringsStrategy: "recursive",
+      matchStrings: [
+        "name: postgresql-(?<flavor>minimal|standard|system)-(?<os>[a-z]+)\\n[ \\t]+major: \\d+\\n[\\s\\S]*?\\n[ \\t]+serverName: (?<server>[a-z0-9-]+)-pg\\d+\\n",
+        "major: (?<currentValue>\\d+)\\n",
+      ],
+      autoReplaceStringTemplate: "major: {{{newValue}}}\n",
+      depNameTemplate: "{{{server}}}",
+      depTypeTemplate: "cnpg-postgres-major",
+      packageNameTemplate: "ghcr.io/cloudnative-pg/postgresql",
+      datasourceTemplate: "docker",
+      versioningTemplate: "loose",
+      extractVersionTemplate: "^(?<version>\\d+)\\.\\d+-{{{flavor}}}-{{{os}}}$",
+    },
+    {
+      customType: "regex",
+      description: "Move a CNPG Cluster's archive serverName to the next Postgres major, alongside the major",
+      managerFilePatterns: ["/(^|/)(apps|clusters)/.+\\.ya?ml$/"],
+      matchStringsStrategy: "recursive",
+      matchStrings: [
+        "name: postgresql-(?<flavor>minimal|standard|system)-(?<os>[a-z]+)\\n[ \\t]+major: \\d+\\n[\\s\\S]*?\\n[ \\t]+serverName: (?<server>[a-z0-9-]+)-pg\\d+\\n",
+        "serverName: [a-z0-9-]+-pg(?<currentValue>\\d+)\\n",
+      ],
+      autoReplaceStringTemplate: "serverName: {{{depName}}}-pg{{{newValue}}}\n",
+      depNameTemplate: "{{{server}}}",
+      depTypeTemplate: "cnpg-archive-major",
+      packageNameTemplate: "ghcr.io/cloudnative-pg/postgresql",
+      datasourceTemplate: "docker",
+      versioningTemplate: "loose",
+      extractVersionTemplate: "^(?<version>\\d+)\\.\\d+-{{{flavor}}}-{{{os}}}$",
+    },
+    {
+      customType: "regex",
+      description: "Point a CNPG Cluster's recovery source at the archive of the next Postgres major, alongside the major",
+      managerFilePatterns: ["/(^|/)(apps|clusters)/.+\\.ya?ml$/"],
+      matchStringsStrategy: "recursive",
+      matchStrings: [
+        "name: postgresql-(?<flavor>minimal|standard|system)-(?<os>[a-z]+)\\n[ \\t]+major: \\d+\\n[\\s\\S]*?\\n[ \\t]+serverName: (?<server>[a-z0-9-]+)-pg\\d+\\n[\\s\\S]*?externalClusters:\\n[\\s\\S]*?serverName: [a-z0-9-]+-pg\\d+\\n",
+        "externalClusters:\\n[\\s\\S]*\\n",
+        "serverName: [a-z0-9-]+-pg(?<currentValue>\\d+)\\n",
+      ],
+      autoReplaceStringTemplate: "serverName: {{{depName}}}-pg{{{newValue}}}\n",
+      depNameTemplate: "{{{server}}}",
+      depTypeTemplate: "cnpg-archive-major",
+      packageNameTemplate: "ghcr.io/cloudnative-pg/postgresql",
+      datasourceTemplate: "docker",
+      versioningTemplate: "loose",
+      extractVersionTemplate: "^(?<version>\\d+)\\.\\d+-{{{flavor}}}-{{{os}}}$",
+    },
+    {
+      customType: "regex",
+      description: "Propose a CNPG Cluster's next Debian release, available for its current image type and Postgres major",
+      managerFilePatterns: ["/(^|/)(apps|clusters)/.+\\.ya?ml$/"],
+      matchStrings: [
+        "name: postgresql-(?<flavor>minimal|standard|system)-(?<currentValue>[a-z]+)\\n[ \\t]+major: (?<major>\\d+)\\n[\\s\\S]*?\\n[ \\t]+serverName: (?<server>[a-z0-9-]+)-pg\\d+\\n",
+      ],
+      depNameTemplate: "{{{server}}}",
+      depTypeTemplate: "cnpg-debian",
+      packageNameTemplate: "ghcr.io/cloudnative-pg/postgresql",
+      datasourceTemplate: "docker",
+      versioningTemplate: "debian",
+      extractVersionTemplate: "^{{{major}}}\\.\\d+-{{{flavor}}}-(?<version>[a-z]+)$",
+    },
+  ],
+  packageRules: [
+    {
+      description: "Every Postgres major and Debian change waits for review; merging it starts the upgrade",
+      matchDepTypes: ["cnpg-postgres-major", "cnpg-archive-major", "cnpg-debian"],
+      automerge: false,
+      pinDigests: false,
+      addLabels: ["manual"],
+      assignees: ["JacobSartin"],
+      semanticCommitScope: "cnpg",
+    },
+    {
+      description: "One PR per Cluster; overrides the image-and-schema group",
+      matchDepTypes: ["cnpg-postgres-major", "cnpg-archive-major"],
+      groupName: "Postgres major for {{{depName}}}",
+    },
+    {
+      matchDepTypes: ["cnpg-postgres-major"],
+      prBodyNotes: [
+        "Release notes: [PostgreSQL {{{newValue}}}](https://www.postgresql.org/docs/{{{newValue}}}/release-{{{newValue}}}.html), especially [Migration to Version {{{newValue}}}](https://www.postgresql.org/docs/{{{newValue}}}/release-{{{newValue}}}.html#RELEASE-{{{newValue}}}-MIGRATION). When skipping majors from {{{currentValue}}}, read each skipped version's migration notes too: [all releases](https://www.postgresql.org/docs/release/).",
+        "Merging stops every instance and runs pg_upgrade (CNPG offline in-place upgrade); replicas are re-cloned afterwards. WAL archiving continues under the new `serverName`, and the old archive stays as it was.",
+        "The ScheduledBackup is named after the `serverName`, so it is replaced, and its immediate backup becomes the new archive's first base backup once the upgraded primary is ready. `externalClusters` moves to the new archive too. To roll back a failed upgrade, revert this PR.",
+        "Retention only prunes the current `serverName`, so the old major's archive stays in the bucket as the pre-upgrade restore point. The Barman plugin deletes the Backup objects of that archive once the Cluster moves to the new name; the data stays. Delete the old prefix by hand once you no longer need it.",
+      ],
+    },
+    {
+      matchDepTypes: ["cnpg-debian"],
+      groupName: "Debian release for {{{depName}}}",
+      prBodyNotes: [
+        "Merging rolls the instances onto the new Debian release (new glibc). Databases on the C locale (`datcollate = C`) are unaffected; any other glibc collation needs a REINDEX and `ALTER DATABASE ... REFRESH COLLATION VERSION` afterwards.",
+        "Do not merge while a Postgres major PR for this Cluster is rolling out: a major upgrade needs both images on the same Debian release.",
+      ],
+    },
+  ],
+}

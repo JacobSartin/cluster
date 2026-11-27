@@ -1,0 +1,3 @@
+# Homepage requires this file even when no Proxmox integration is configured.
+---
+{}

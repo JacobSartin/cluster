@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/generators.external-secrets.io/password_v1alpha1.json
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: homepage-oidc
+  namespace: homepage
+spec:
+  length: 64
+  digits: 16
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/external-secrets.io/externalsecret_v1.json
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: homepage-auth
+  namespace: homepage
+spec:
+  refreshPolicy: Periodic
+  refreshInterval: 2160h
+  target:
+    name: homepage-auth
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        oidc-client-id: "${HOMEPAGE_OIDC_CLIENT_ID}"
+        oidc-client-secret: "{{ .password }}"
+        oidc-client-secret-digest: "{{ .password | bcrypt }}"
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: homepage-oidc

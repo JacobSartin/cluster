@@ -1,0 +1,69 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rustfs
+  namespace: external-services
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: 30293
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: rustfs
+  namespace: external-services
+  labels:
+    endpointslice.kubernetes.io/managed-by: cluster-gitops
+    kubernetes.io/service-name: rustfs
+
+addressType: IPv4
+ports:
+  - name: http
+    protocol: TCP
+    port: 30293
+endpoints:
+  - addresses:
+      - "${NAS_IP}"
+    conditions:
+      ready: true
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rustfs
+  namespace: external-services
+  labels:
+    auth.jacobsartin.com/authelia: bypass
+    gateway-role: internal
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/external: "true"
+    gethomepage.dev/group: "External Services"
+    gethomepage.dev/href: "https://rustfs.${BASE_DOMAIN}"
+    gethomepage.dev/icon: "mdi-database"
+    gethomepage.dev/name: "RustFS"
+    gethomepage.dev/weight: "60"
+    gatus.home-operations.com/endpoint: |
+      url: https://rustfs.${BASE_DOMAIN}/minio/health/live
+spec:
+  hostnames:
+    - rustfs.${BASE_DOMAIN}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: internal
+      namespace: traefik-internal
+      sectionName: websecure
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: rustfs
+          port: 30293

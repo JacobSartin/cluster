@@ -1,0 +1,86 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  main:
+    forceRename: minecraft-gate
+
+    pod:
+      annotations:
+        configmap.reloader.stakater.com/reload: minecraft-gate-config
+
+    containers:
+      main:
+        image:
+          repository: ghcr.io/minekube/gate
+          tag: v0.82.3@sha256:5c70572b67dabba01d0bcb309c6b8f8baeb55dd8004428ba0bcb1e3aeecbf69a
+
+        stdin: true
+
+        tty: true
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 25565
+              failureThreshold: 30
+              periodSeconds: 5
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 25565
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 25565
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 256Mi
+
+service:
+  main:
+    forceRename: minecraft-gate
+    controller: main
+    type: LoadBalancer
+    annotations:
+      metallb.io/address-pool: games
+      metallb.io/allow-shared-ip: games
+    ports:
+      main:
+        port: 25565
+        protocol: TCP
+      query:
+        port: 25565
+        protocol: UDP
+
+persistence:
+  config-file:
+    type: configMap
+    name: minecraft-gate-config
+    globalMounts:
+      - path: /config.yaml
+        subPath: config.yaml
+        readOnly: true

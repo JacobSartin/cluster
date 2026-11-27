@@ -1,0 +1,120 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: shared-tenant-credentials
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods", "secrets"]
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["serviceaccounts/token"]
+  variables:
+    - name: tenantAccounts
+      expression: "['flux', 'shared-kubectl']"
+    - name: isToken
+      expression: request.resource.resource == 'serviceaccounts' && request.subResource == 'token'
+    - name: maxTokenSeconds
+      expression: "28800"
+  validations:
+    - expression: >-
+        request.resource.resource != 'secrets' ||
+        dyn(object).?type.orValue('') != 'kubernetes.io/service-account-token'
+      message: ServiceAccount token Secrets are not allowed in shared; issue a time-bound token instead
+    - expression: "!variables.isToken || request.name != 'flux'"
+      message: shared/flux gets no tokens; Flux impersonates it
+    - expression: >-
+        !variables.isToken || request.name != 'shared-kubectl' ||
+        dyn(object).spec.?expirationSeconds.orValue(3600) <= variables.maxTokenSeconds
+      message: shared-kubectl tokens may last at most 8h (--duration=8h)
+    - expression: >-
+        request.resource.resource != 'pods' ||
+        !(dyn(object).spec.?serviceAccountName.orValue('') in variables.tenantAccounts ||
+          dyn(object).spec.?serviceAccount.orValue('') in variables.tenantAccounts)
+      message: pods in shared may not run as flux or shared-kubectl
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: shared-tenant-credentials
+spec:
+  policyName: shared-tenant-credentials
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: shared
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: shared-tenant-routes
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["gateway.networking.k8s.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["httproutes"]
+  variables:
+    - name: hostnames
+      expression: object.spec.?hostnames.orValue([])
+    # Hostnames the shared tenant may serve; add one here for each new shared app.
+    - name: allowedHosts
+      expression: "['mise'].map(h, h + '.${BASE_DOMAIN}')"
+  validations:
+    - expression: size(variables.hostnames) > 0
+      message: HTTPRoutes in shared must list their hostnames
+    - expression: variables.hostnames.all(h, h in variables.allowedHosts)
+      messageExpression: >-
+        'HTTPRoutes in shared may serve only ' + variables.allowedHosts.join(', ') + ', not ' +
+        variables.hostnames.filter(h, !(h in variables.allowedHosts)).join(', ')
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: shared-tenant-routes
+spec:
+  policyName: shared-tenant-routes
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: shared
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: shared-tenant-services
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["services"]
+  validations:
+    - expression: >-
+        !has(object.metadata.annotations) ||
+        !object.metadata.annotations.exists(k, k.startsWith('unifi-port-forward.fiskhe.st/'))
+      message: Services in shared may not request router port forwards (unifi-port-forward.fiskhe.st annotations)
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: shared-tenant-services
+spec:
+  policyName: shared-tenant-services
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: shared

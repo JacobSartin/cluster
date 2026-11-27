@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - blocky/ks.yaml
+  - clusterissuer/ks.yaml
+  - metallb-config/ks.yaml
+  - metallb-pools/ks.yaml
+  - auth
+  - actions-runner-controller/ks.yaml
+  - tenants/ks.yaml
+  - renovate/ks.yaml

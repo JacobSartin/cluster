@@ -1,0 +1,26 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  packageRules: [
+    {
+      description: "Flux release tags carry a v prefix; the FluxInstance version does not",
+      matchDatasources: ["github-releases"],
+      matchDepNames: ["fluxcd/flux2"],
+      extractVersion: "^v(?<version>.+)$",
+    },
+    {
+      description: "Update the Flux Operator and FluxInstance charts together",
+      matchManagers: ["flux"],
+      matchDatasources: ["docker"],
+      matchPackageNames: [
+        "ghcr.io/controlplaneio-fluxcd/charts/flux-instance",
+        "ghcr.io/controlplaneio-fluxcd/charts/flux-operator",
+      ],
+      groupName: "Flux Operator and FluxInstance charts",
+      groupSlug: "flux-operator-and-flux-instance-charts",
+      separateMajorMinor: false,
+      separateMinorPatch: false,
+      separateMultipleMajor: false,
+      separateMultipleMinor: false,
+    },
+  ],
+}

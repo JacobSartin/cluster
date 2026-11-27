@@ -1,0 +1,435 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+controllers:
+  main:
+    forceRename: minecraft-java
+    annotations:
+      configmap.reloader.stakater.com/reload: minecraft-java-mods,minecraft-java-codeserver-settings
+    replicas: 1
+    strategy: Recreate
+
+    pod:
+      securityContext:
+        fsGroup: &runAsGroup 568
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: *runAsGroup
+        runAsNonRoot: true
+        runAsUser: &runAsUser 568
+
+      terminationGracePeriodSeconds: 120
+    containers:
+      main:
+        image:
+          repository: ghcr.io/itzg/minecraft-server
+          tag: 2026.11.1-java25@sha256:0634ff76eee896c7e9760a35117d24fad394857d10bc8c1d9bc7f7ff7deef3c2
+
+        env:
+          TZ: ${TZ}
+          UMASK: "0022"
+          ALLOW_NETHER: "true"
+          ANNOUNCE_PLAYER_ACHIEVEMENTS: "true"
+          DIFFICULTY: hard
+          ENABLE_COMMAND_BLOCK: "false"
+          ENABLE_QUERY: "true"
+          ENABLE_SSH: "false"
+          ENABLE_WHITELIST: "true"
+          EULA: "TRUE"
+          FORCE_GAMEMODE: "false"
+          GENERATE_STRUCTURES: "true"
+          GUI: "FALSE"
+          HARDCORE: "false"
+          LEVEL: world
+          LEVEL_TYPE: DEFAULT
+          MAX_PLAYERS: "20"
+          MAX_TICK_TIME: "60000"
+          MAX_WORLD_SIZE: "10000"
+          MEMORY: 16G
+          MODE: survival
+          MODRINTH_PROJECTS:
+            valueFrom:
+              configMapKeyRef:
+                name: minecraft-java-mods
+                key: MODRINTH_PROJECTS
+          MOTD:
+            valueFrom:
+              secretKeyRef:
+                name: minecraft-java-motd
+                key: motd
+          ONLINE_MODE: "true"
+          OVERRIDE_SERVER_PROPERTIES: "true"
+          PVP: "false"
+          QUERY_PORT: "{{ .Values.service.main.ports.query.port }}"
+          RCON_PORT: "{{ .Values.service.rcon.ports.rcon.port }}"
+          SEED: "-7732404551375211234"
+          SERVER_PORT: "{{ .Values.service.main.ports.minecraft.port }}"
+          SPAWN_ANIMALS: "true"
+          SPAWN_MONSTERS: "true"
+          SPAWN_NPCS: "true"
+          TYPE: FABRIC
+          USE_AIKAR_FLAGS: "true"
+          VANILLATWEAKS_SHARECODE: dqZDv4, y4jgYk
+          VERSION: 1.21.8
+          VIEW_DISTANCE: 10
+          RCON_PASSWORD: &rconPassword
+            valueFrom:
+              secretKeyRef:
+                name: minecraft-java-rcon-credentials
+                key: password
+          # Empty values select compatible Fabric defaults.
+          FABRIC_INSTALLER: ""
+          FABRIC_INSTALLER_URL: ""
+          FABRIC_LOADER_VERSION: ""
+          UID: "{{ .Values.controllers.main.pod.securityContext.runAsUser }}"
+          GID: "{{ .Values.controllers.main.pod.securityContext.runAsGroup }}"
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command:
+                  - mc-health
+              failureThreshold: 120
+              initialDelaySeconds: 10
+              periodSeconds: 5
+              successThreshold: 1
+              timeoutSeconds: 3
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command:
+                  - mc-health
+              failureThreshold: 4
+              initialDelaySeconds: 10
+              periodSeconds: 12
+              successThreshold: 2
+              timeoutSeconds: 5
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command:
+                  - mc-health
+              failureThreshold: 5
+              initialDelaySeconds: 12
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 5
+
+        securityContext: &nonRootSecurityContext
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: *runAsGroup
+          runAsNonRoot: true
+          runAsUser: *runAsUser
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 4000m
+            memory: 16Gi
+
+          limits:
+            cpu: 12000m
+            memory: 20Gi
+
+      mcbackup:
+        image:
+          repository: docker.io/itzg/mc-backup
+          tag: 2026.11.2@sha256:f8da37bc50d2f29451d0ad6a7b4decf541bba86493cba8336b203bb03cfc4aaa
+
+        env:
+          BACKUP_METHOD: restic
+          DEST_DIR: /backups
+          SRC_DIR: /data
+          RESTIC_REPOSITORY: /backups/restic
+          RESTIC_HOST: minecraft-java
+          RESTIC_PASSWORD:
+            valueFrom:
+              secretKeyRef:
+                name: minecraft-java-restic
+                key: RESTIC_PASSWORD
+          SERVER_PORT: "{{ .Values.service.main.ports.minecraft.port }}"
+          RCON_HOST: 127.0.0.1
+          RCON_PORT: "{{ .Values.service.rcon.ports.rcon.port }}"
+          RCON_PASSWORD: *rconPassword
+          SERVER_HOST: 127.0.0.1
+          EXCLUDES: "*.jar,cache,logs,*.tmp,./bluemap"
+          INITIAL_DELAY: 2m
+          BACKUP_INTERVAL: 24h
+          PRUNE_RESTIC_RETENTION: "--keep-within 7d"
+          PAUSE_IF_NO_PLAYERS: "false"
+          PLAYERS_ONLINE_CHECK_INTERVAL: 5m
+          TZ: ${TZ}
+
+        securityContext: *nonRootSecurityContext
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+
+      codeserver:
+        image:
+          repository: ghcr.io/coder/code-server
+          tag: 4.146.0-bookworm@sha256:0858cd2155193cbf0829b0d95de80a2717d791b02d098b15b96781ff113a4fdc
+
+        # Bypass fixuid when Kubernetes sets the UID.
+        command:
+          - /usr/bin/dumb-init
+          - --
+          - /usr/bin/code-server
+        args:
+          - --bind-addr
+          - "0.0.0.0:{{ .Values.service.codeserver.ports.http.port }}"
+          - --auth
+          - none
+          - --disable-telemetry
+          - --disable-update-check
+          - --user-data-dir
+          - /config/data
+          - --extensions-dir
+          - /config/extensions
+          - /data
+
+        env:
+          TZ: ${TZ}
+          HOME: /config
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              failureThreshold: 60
+              httpGet:
+                path: /
+                port: &codeserverPort 12321
+                scheme: HTTP
+              initialDelaySeconds: 10
+              periodSeconds: 5
+              successThreshold: 1
+              timeoutSeconds: 3
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              failureThreshold: 4
+              httpGet:
+                path: /
+                port: *codeserverPort
+                scheme: HTTP
+              initialDelaySeconds: 10
+              periodSeconds: 12
+              successThreshold: 2
+              timeoutSeconds: 5
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              failureThreshold: 5
+              httpGet:
+                path: /
+                port: *codeserverPort
+                scheme: HTTP
+              initialDelaySeconds: 12
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 5
+
+        securityContext: *nonRootSecurityContext
+
+        resources:
+          requests:
+            cpu: 75m
+            memory: 200Mi
+
+          limits:
+            cpu: 1500m
+            memory: 2400Mi
+
+service:
+  main:
+    forceRename: minecraft-java
+    controller: main
+    ports:
+      minecraft:
+        port: 25565
+        protocol: TCP
+      query:
+        port: 25565
+        protocol: UDP
+
+  rcon:
+    controller: main
+    ports:
+      rcon:
+        port: 25575
+
+  bluemap:
+    controller: main
+    ports:
+      http:
+        port: 8100
+
+  codeserver:
+    controller: main
+    ports:
+      http:
+        port: *codeserverPort
+
+listenerSets:
+  external:
+    labels:
+      gateway-role: external
+    parentRef:
+      name: external
+      namespace: traefik-external
+    listeners:
+      - name: https
+        hostname: map.${BASE_DOMAIN}
+        port: 8443
+        protocol: HTTPS
+        tls:
+          certificateRefs:
+            - name: minecraft-java-bluemap-gateway-tls
+
+route:
+  # Public map, so it skips the namespace's Authelia filter.
+  bluemap:
+    forceRename: minecraft-java-bluemap
+    kind: HTTPRoute
+    labels:
+      gateway-role: external
+      auth.jacobsartin.com/authelia: bypass
+    annotations:
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/name: "Minecraft"
+      gethomepage.dev/group: "Overview"
+      gethomepage.dev/icon: "minecraft.svg"
+      gethomepage.dev/href: "https://map.${BASE_DOMAIN}"
+      gethomepage.dev/description: "mc.${BASE_DOMAIN}"
+      gethomepage.dev/widget.type: "minecraft"
+      gethomepage.dev/widget.url: "udp://minecraft-java.minecraft.svc.cluster.local:25565"
+    hostnames:
+      - map.${BASE_DOMAIN}
+    parentRefs:
+      # cloudflared's listener. LAN DNS and Gatus also need a Gateway parent.
+      - name: external
+        namespace: traefik-external
+        sectionName: tunnel
+      - identifier: external
+        sectionName: https
+    rules:
+      - backendRefs:
+          - identifier: bluemap
+            port: http
+
+  # Keeps the name it had as the only route.
+  codeserver:
+    forceRename: minecraft-java
+    kind: HTTPRoute
+    labels:
+      gateway-role: internal
+    hostnames:
+      - edit-mc.${BASE_DOMAIN}
+    parentRefs:
+      - name: internal
+        namespace: traefik-internal
+        sectionName: websecure
+    rules:
+      - backendRefs:
+          - identifier: codeserver
+            port: *codeserverPort
+
+persistence:
+  codeserver-settings:
+    type: configMap
+    name: minecraft-java-codeserver-settings
+    advancedMounts:
+      main:
+        codeserver:
+          - path: /config/data/User/settings.json
+            subPath: settings.json
+            readOnly: true
+
+  data:
+    existingClaim: minecraft-java-data
+    advancedMounts:
+      main:
+        main:
+          - path: /data
+        mcbackup:
+          - path: /data
+            readOnly: true
+        codeserver:
+          - path: /data
+
+  bluemap:
+    type: nfs
+    server: ${NAS_IP}
+    path: ${NAS_GAMES_PATH}
+    advancedMounts:
+      main:
+        main:
+          - path: /data/bluemap
+            subPath: minecraft/bluemap
+        codeserver:
+          - path: /data/bluemap
+            subPath: minecraft/bluemap
+
+  backups:
+    type: nfs
+    server: ${NAS_IP}
+    path: ${NAS_BACKUPS_PATH}/minecraft
+    advancedMounts:
+      main:
+        mcbackup:
+          - path: /backups
+        codeserver:
+          - path: /backups
+
+  games:
+    type: nfs
+    server: ${NAS_IP}
+    path: ${NAS_GAMES_PATH}
+    advancedMounts:
+      main:
+        main:
+          - path: /mods
+            subPath: minecraft/mods
+          - path: /config
+            subPath: minecraft/config
+          - path: /scripts
+            subPath: minecraft/scripts
+        codeserver:
+          - path: /mods
+            subPath: minecraft/mods
+          - path: /minecraft-config
+            subPath: minecraft/config
+          - path: /scripts
+            subPath: minecraft/scripts
+
+  tmp:
+    type: emptyDir
+    globalMounts:
+      - path: /tmp
+
+  codeserver-config:
+    type: emptyDir
+    advancedMounts:
+      main:
+        codeserver:
+          - path: /config

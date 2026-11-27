@@ -1,0 +1,41 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: volsync-single-replica-storage
+spec:
+  failurePolicy: Fail
+  reinvocationPolicy: IfNeeded
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["volsync.backube"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources:
+          - replicationsources
+          - replicationdestinations
+  matchConditions:
+    - name: restic-mover
+      expression: has(object.spec.restic)
+  mutations:
+    - patchType: JSONPatch
+      jsonPatch:
+        expression: |-
+          [
+            JSONPatch{
+              op: "add",
+              path: "/spec/restic/storageClassName",
+              value: "longhorn-single"
+            },
+            JSONPatch{
+              op: "add",
+              path: "/spec/restic/cacheStorageClassName",
+              value: "longhorn-single"
+            }
+          ]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: volsync-single-replica-storage
+spec:
+  policyName: volsync-single-replica-storage

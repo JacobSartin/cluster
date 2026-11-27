@@ -1,0 +1,30 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: grafana-alloy
+  namespace: grafana-alloy
+spec:
+  groups:
+    - name: grafana-alloy.rules
+      rules:
+        - alert: GrafanaAlloyDroppingLogs
+          expr: sum by (namespace, pod, reason) (rate(loki_write_dropped_entries_total[5m])) > 0
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: Grafana Alloy is dropping log entries
+            description: >-
+              Alloy pod {{ $labels.pod }} in {{ $labels.namespace }} is dropping
+              log entries because of {{ $labels.reason }}.
+
+        - alert: GrafanaAlloyMetricsMissing
+          expr: absent(up{namespace="grafana-alloy", service="grafana-alloy"} == 1)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Grafana Alloy metrics are missing
+            description: >-
+              Prometheus has not seen a healthy Grafana Alloy metrics target for
+              10 minutes, so log delivery failures may be invisible.

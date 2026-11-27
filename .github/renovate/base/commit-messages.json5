@@ -1,0 +1,44 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  semanticCommits: "enabled",
+  semanticCommitType: "chore",
+  semanticCommitScope: "deps",
+  commitMessageTopic: "{{depName}}",
+  commitMessageExtra: "{{currentVersion}} → {{newVersion}}",
+  packageRules: [
+    {
+      matchManagers: ["helm-values"],
+      commitMessageTopic: "image {{depName}}",
+      semanticCommitScope: "helm",
+    },
+    {
+      matchManagers: ["helm-values"],
+      matchUpdateTypes: ["digest", "pin", "pinDigest"],
+      commitMessageExtra: "digest to {{newDigestShort}}",
+    },
+    {
+      matchManagers: ["flux"],
+      commitMessageTopic: "chart {{depName}}",
+      semanticCommitScope: "flux",
+    },
+    {
+      matchManagers: ["flux"],
+      matchDatasources: ["docker"],
+      matchPackageNames: ["/.+/.+/"],
+      commitMessageTopic: "image {{depName}}",
+    },
+    {
+      description: "Every OCIRepository under repositories/oci is a Helm chart",
+      matchManagers: ["flux"],
+      matchFileNames: ["repositories/oci/**"],
+      commitMessageTopic: "chart {{depName}}",
+    },
+    {
+      matchManagers: ["flux"],
+      matchUpdateTypes: ["digest", "pin", "pinDigest"],
+      commitMessageExtra: "digest to {{newDigestShort}}",
+    },
+    { matchManagers: ["github-actions"], semanticCommitScope: "github-action" },
+    { matchManagers: ["npm"], semanticCommitScope: "npm" },
+  ],
+}

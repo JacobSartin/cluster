@@ -1,0 +1,24 @@
+---
+- datetime:
+    text_size: xl
+    format:
+      dateStyle: full
+      timeStyle: short
+      hour12: true
+- openmeteo:
+    label: "{{HOMEPAGE_VAR_WEATHER_1_LABEL}}"
+    latitude: "{{HOMEPAGE_VAR_WEATHER_1_LATITUDE}}"
+    longitude: "{{HOMEPAGE_VAR_WEATHER_1_LONGITUDE}}"
+    timezone: "{{HOMEPAGE_VAR_WEATHER_TIMEZONE}}"
+    units: imperial
+    cache: 15
+- openmeteo:
+    label: "{{HOMEPAGE_VAR_WEATHER_2_LABEL}}"
+    latitude: "{{HOMEPAGE_VAR_WEATHER_2_LATITUDE}}"
+    longitude: "{{HOMEPAGE_VAR_WEATHER_2_LONGITUDE}}"
+    timezone: "{{HOMEPAGE_VAR_WEATHER_TIMEZONE}}"
+    units: imperial
+    cache: 15
+- search:
+    provider: duckduckgo
+    target: _blank

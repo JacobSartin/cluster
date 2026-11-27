@@ -1,0 +1,19 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: assettocorsa
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: volsync
+    - name: traefik-internal
+    - name: external-secrets-stores
+    - name: unifi-port-forward
+    - name: longhorn
+    - name: metallb-pools
+  interval: 10m
+  path: clusters/main/kubernetes/apps/games/assettocorsa/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster

@@ -1,0 +1,75 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/v1.36.0/mutatingadmissionpolicy-admissionregistration-v1.json
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: pod-placement
+spec:
+  failurePolicy: Ignore
+  reinvocationPolicy: Never
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: ["longhorn-system"]
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: not-bound
+      expression: object.spec.?nodeName.orValue("") == ""
+    - name: not-daemonset
+      expression: >-
+        !object.metadata.?ownerReferences.orValue([]).exists(o, o.kind == "DaemonSet")
+    - name: no-own-preference
+      expression: >-
+        !object.spec.?affinity.?podAffinity.hasValue() &&
+        !object.spec.?affinity.?nodeAffinity.?preferredDuringSchedulingIgnoredDuringExecution.hasValue()
+    - name: has-storage
+      expression: >-
+        object.spec.?volumes.orValue([]).exists(v, has(v.persistentVolumeClaim) || has(v.ephemeral))
+  variables:
+    - name: term
+      expression: |-
+        {
+          "weight": dyn(100),
+          "preference": dyn({
+            "matchExpressions": [{
+              "key": dyn("node.longhorn.io/create-default-disk"),
+              "operator": dyn("In"),
+              "values": dyn(["true", "config"])
+            }]
+          })
+        }
+  mutations:
+    - patchType: JSONPatch
+      jsonPatch:
+        expression: |-
+          !has(object.spec.affinity)
+            ? [JSONPatch{
+                op: "add",
+                path: "/spec/affinity",
+                value: {"nodeAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [variables.term]}}
+              }]
+            : !has(object.spec.affinity.nodeAffinity)
+              ? [JSONPatch{
+                  op: "add",
+                  path: "/spec/affinity/nodeAffinity",
+                  value: {"preferredDuringSchedulingIgnoredDuringExecution": [variables.term]}
+                }]
+              : [JSONPatch{
+                  op: "add",
+                  path: "/spec/affinity/nodeAffinity/preferredDuringSchedulingIgnoredDuringExecution",
+                  value: [variables.term]
+                }]
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/v1.36.0/mutatingadmissionpolicybinding-admissionregistration-v1.json
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: pod-placement
+spec:
+  policyName: pod-placement

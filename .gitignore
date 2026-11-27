@@ -1,0 +1,8 @@
+age.agekey
+*.pub
+*.key
+.decrypted~*
+*sopssecret.secret.yaml
+kubeconfig
+talosconfig
+node_modules/

@@ -1,0 +1,305 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+controllers:
+  main:
+    forceRename: assettocorsa
+    annotations:
+      configmap.reloader.stakater.com/reload: assettocorsa-codeserver-settings
+    replicas: 0
+
+    strategy: Recreate
+    pod:
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+    containers:
+      main:
+        image:
+          repository: ghcr.io/ich777/steamcmd
+          tag: assettocorsa@sha256:ae225d6d3b2e777f8be99ac3bb6c3eace7057aef8d78abbeb8b3407e51b87acf
+
+        env:
+          TZ: ${TZ}
+          GAME_ID: "302550"
+          USERNAME:
+            valueFrom:
+              secretKeyRef:
+                name: assettocorsa-steam
+                key: username
+          PASSWRD:
+            valueFrom:
+              secretKeyRef:
+                name: assettocorsa-steam
+                key: password
+          INSTALL_ASSETTO_SERVER_MANAGER: "true"
+          STEAMCMD_DIR: /serverdata/steamcmd
+          SERVER_DIR: /serverdata/serverfiles
+          UID: "568"
+          GID: "568"
+          UMASK: "007"
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 8772
+              periodSeconds: 5
+              failureThreshold: 240
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 8772
+              periodSeconds: 10
+              failureThreshold: 3
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 8772
+              periodSeconds: 30
+              failureThreshold: 3
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+              - CHOWN
+              - SETUID
+              - SETGID
+              - FOWNER
+              - DAC_OVERRIDE
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 0
+          runAsUser: 0
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 250m
+            memory: 1Gi
+          limits:
+            memory: 6Gi
+
+      codeserver:
+        image:
+          repository: ghcr.io/coder/code-server
+          tag: 4.146.0-bookworm@sha256:0858cd2155193cbf0829b0d95de80a2717d791b02d098b15b96781ff113a4fdc
+
+        # Bypass fixuid when Kubernetes sets the UID.
+        command:
+          - /usr/bin/dumb-init
+          - --
+          - /usr/bin/code-server
+        args:
+          - --bind-addr
+          - 0.0.0.0:12321
+          - --auth
+          - none
+          - --user-data-dir
+          - /config/data
+          - --extensions-dir
+          - /config/extensions
+          - /serverdata/serverfiles
+
+        env:
+          TZ: ${TZ}
+          HOME: /config
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 12321
+              periodSeconds: 5
+              failureThreshold: 60
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 12321
+              periodSeconds: 10
+              failureThreshold: 3
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 12321
+              periodSeconds: 30
+              failureThreshold: 3
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: false
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 2Gi
+
+service:
+  game:
+    controller: main
+    type: LoadBalancer
+    annotations:
+      metallb.io/address-pool: games
+      metallb.io/allow-shared-ip: games
+    ports:
+      tcp:
+        port: 9600
+        protocol: TCP
+      udp:
+        port: 9600
+        protocol: UDP
+      api:
+        port: 8081
+        protocol: TCP
+
+  manager:
+    controller: main
+    ports:
+      http:
+        port: 8772
+
+  codeserver:
+    controller: main
+    ports:
+      http:
+        port: 12321
+
+route:
+  manager:
+    kind: HTTPRoute
+    labels:
+      gateway-role: internal
+    annotations:
+      gatus.home-operations.com/enabled: "false"
+    hostnames:
+      - assetto.${BASE_DOMAIN}
+    parentRefs:
+      - name: internal
+        namespace: traefik-internal
+        sectionName: websecure
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        backendRefs:
+          - identifier: manager
+            port: http
+
+  codeserver:
+    kind: HTTPRoute
+    labels:
+      gateway-role: internal
+    annotations:
+      gatus.home-operations.com/enabled: "false"
+    hostnames:
+      - edit-assetto.${BASE_DOMAIN}
+    parentRefs:
+      - name: internal
+        namespace: traefik-internal
+        sectionName: websecure
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        backendRefs:
+          - identifier: codeserver
+            port: http
+
+persistence:
+  codeserver-settings:
+    type: configMap
+    name: assettocorsa-codeserver-settings
+    advancedMounts:
+      main:
+        codeserver:
+          - path: /config/data/User/settings.json
+            subPath: settings.json
+            readOnly: true
+
+  codeserver-config:
+    type: emptyDir
+    advancedMounts:
+      main:
+        codeserver:
+          - path: /config
+
+  serverfiles:
+    type: persistentVolumeClaim
+    storageClass: longhorn
+    accessMode: ReadWriteOnce
+    size: 50Gi
+    retain: true
+    advancedMounts:
+      main:
+        main:
+          - path: /serverdata/serverfiles
+        codeserver:
+          - path: /serverdata/serverfiles
+
+  manager-state:
+    existingClaim: assettocorsa-manager-state
+    advancedMounts:
+      main:
+        main:
+          - path: /serverdata/serverfiles/assetto-server-manager/linux
+            subPath: linux
+          - path: /serverdata/serverfiles/cfg
+            subPath: cfg
+          - path: /serverdata/serverfiles/presets
+            subPath: presets
+          - path: /serverdata/serverfiles/manager
+            subPath: manager
+          - path: /serverdata/serverfiles/results
+            subPath: results
+          - path: /serverdata/serverfiles/setups
+            subPath: setups
+        codeserver:
+          - path: /serverdata/serverfiles/assetto-server-manager/linux
+            subPath: linux
+          - path: /serverdata/serverfiles/cfg
+            subPath: cfg
+          - path: /serverdata/serverfiles/presets
+            subPath: presets
+          - path: /serverdata/serverfiles/manager
+            subPath: manager
+          - path: /serverdata/serverfiles/results
+            subPath: results
+          - path: /serverdata/serverfiles/setups
+            subPath: setups
+
+  steamcmd:
+    type: emptyDir
+    advancedMounts:
+      main:
+        main:
+          - path: /serverdata/steamcmd

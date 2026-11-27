@@ -1,0 +1,172 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kube-prometheus-stack
+  namespace: kube-prometheus-stack
+spec:
+  interval: 15m
+  chartRef:
+    kind: OCIRepository
+    name: kube-prometheus-stack
+    namespace: flux-system
+  timeout: 20m
+  values:
+    crds:
+      enabled: false
+
+    cleanPrometheusOperatorObjectNames: true
+
+    prometheusOperator:
+      revisionHistoryLimit: 3
+      resources:
+        requests:
+          cpu: 10m
+          memory: 112Mi
+      kubeletEndpointsEnabled: false
+      kubeletEndpointSliceEnabled: true
+
+    alertmanager:
+      enabled: true
+      podDisruptionBudget:
+        enabled: true
+      route:
+        main:
+          enabled: true
+          labels:
+            gateway-role: internal
+          annotations:
+            gethomepage.dev/enabled: "true"
+            gethomepage.dev/name: "Alertmanager"
+            gethomepage.dev/group: "Metrics"
+            gethomepage.dev/icon: "alertmanager.svg"
+            gethomepage.dev/href: "https://alertmanager.${BASE_DOMAIN}"
+            gethomepage.dev/weight: "40"
+            gethomepage.dev/app: "alertmanager"
+          hostnames:
+            - alertmanager.${BASE_DOMAIN}
+          parentRefs:
+            - group: gateway.networking.k8s.io
+              kind: Gateway
+              name: internal
+              namespace: traefik-internal
+              sectionName: websecure
+      alertmanagerSpec:
+        alertmanagerConfiguration:
+          name: alertmanager
+        externalUrl: https://alertmanager.${BASE_DOMAIN}
+        replicas: 2
+        topologySpreadConstraints:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: DoNotSchedule
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: alertmanager
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+
+    kubeApiServer:
+      serviceMonitor:
+        metricRelabelings:
+          # Chart default.
+          - action: drop
+            regex: (etcd_request|apiserver_request_slo|apiserver_request_sli|apiserver_request)_duration_seconds_bucket;(0\.15|0\.2|0\.3|0\.35|0\.4|0\.45|0\.6|0\.7|0\.8|0\.9|1\.25|1\.5|1\.75|2|3|3\.5|4|4\.5|6|7|8|9|15|20|40|45|50)(\.0)?
+            sourceLabels:
+              - __name__
+              - le
+          # Histograms no rule or dashboard reads.
+          - action: drop
+            regex: (apiserver_watch_events_dispatch_duration_seconds|apiserver_watch_list_duration_seconds|apiserver_storage_list_duration_seconds|apiserver_request_body_size_bytes|apiserver_watch_cache_read_wait_seconds|apiserver_watch_cache_initialization_duration_seconds|apiserver_response_sizes|etcd_request_duration_seconds)_bucket
+            sourceLabels:
+              - __name__
+
+    # Talos etcd has no pod; use host-network endpoints.
+    kubeEtcd:
+      service:
+        selector:
+          component: kube-apiserver
+
+    kubeProxy:
+      enabled: false
+
+    prometheus:
+      ingress:
+        enabled: false
+
+      prometheusSpec:
+        podMonitorSelectorNilUsesHelmValues: false
+        probeSelectorNilUsesHelmValues: false
+        ruleSelectorNilUsesHelmValues: false
+        scrapeConfigSelectorNilUsesHelmValues: false
+        serviceMonitorSelectorNilUsesHelmValues: false
+        enableAdminAPI: false
+        walCompression: true
+        serviceDiscoveryRole: EndpointSlice
+        enableFeatures:
+          - memory-snapshot-on-shutdown
+        retention: 14d
+        retentionSize: 50GB
+        externalLabels:
+          cluster: cluster_main
+          env: prod
+        replicas: 1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 1500Mi
+          limits:
+            memory: 3000Mi
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              resources:
+                requests:
+                  storage: 60Gi
+
+    prometheus-node-exporter:
+      fullnameOverride: node-exporter
+      resources:
+        requests:
+          cpu: 10m
+          memory: 48Mi
+      namespaceOverride: node-exporter
+      prometheus:
+        monitor:
+          enabled: true
+          relabelings:
+            - action: replace
+              regex: (.*)
+              replacement: $1
+              sourceLabels: ["__meta_kubernetes_pod_node_name"]
+              targetLabel: kubernetes_node
+
+    kube-state-metrics:
+      fullnameOverride: kube-state-metrics
+      resources:
+        requests:
+          cpu: 10m
+          memory: 160Mi
+
+    grafana:
+      enabled: false
+      forceDeployDashboards: true
+      forceDeployDatasources: false
+      defaultDashboardsTimezone: browser
+      operator:
+        dashboardsConfigMapRefEnabled: true
+        matchLabels:
+          dashboards: grafana
+        folder: Kubernetes
+
+    nodeExporter:
+      operatingSystems:
+        aix:
+          enabled: false
+        darwin:
+          enabled: false

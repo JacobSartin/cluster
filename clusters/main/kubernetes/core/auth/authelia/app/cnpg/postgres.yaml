@@ -1,0 +1,45 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: authelia-postgres
+  namespace: authelia
+spec:
+  instances: 2
+  resources:
+    requests:
+      cpu: 25m
+      memory: 256Mi
+  affinity:
+    podAntiAffinityType: required
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-standard-trixie
+    major: 19
+  storage:
+    size: 5Gi
+  walStorage:
+    size: 10Gi
+  postgresql:
+    parameters:
+      max_slot_wal_keep_size: 5GB
+  # Recovery must archive under a new serverName.
+  bootstrap:
+    recovery:
+      source: authelia-postgres
+      database: authelia
+      owner: authelia
+  # Update serverName with the Postgres major.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: authelia-rustfs
+        serverName: authelia-postgres-pg19
+  externalClusters:
+    - name: authelia-postgres
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: authelia-rustfs
+          serverName: authelia-postgres-pg19

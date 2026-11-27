@@ -1,0 +1,123 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  tunnel:
+    forceRename: cloudflared-tunnel
+
+    annotations:
+      configmap.reloader.stakater.com/reload: cloudflared-config
+    replicas: 2
+
+    strategy: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+
+    podDisruptionBudget:
+      minAvailable: 1
+
+    pod:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: cloudflared
+                  app.kubernetes.io/controller: tunnel
+              topologyKey: kubernetes.io/hostname
+
+    containers:
+      app:
+        image:
+          repository: docker.io/cloudflare/cloudflared
+          tag: 2026.11.2@sha256:55c7e3e8d89d5e8d20b75a82f3602cbf98e06db406e73e282073cfdc5a9a3af6
+
+        args:
+          - tunnel
+          - --no-autoupdate
+          - --metrics
+          - 0.0.0.0:2000
+          - --write-stream-timeout
+          - 30s
+          - --config
+          - /etc/cloudflared/config.yaml
+          - run
+
+        env:
+          TUNNEL_TOKEN:
+            valueFrom:
+              secretKeyRef:
+                name: cloudflared-tunnel
+                key: tunnelToken
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /ready
+                port: 2000
+              failureThreshold: 30
+              periodSeconds: 5
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /ready
+                port: 2000
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /ready
+                port: 2000
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 65532
+          runAsNonRoot: true
+          runAsUser: 65532
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+
+service:
+  tunnel:
+    forceRename: cloudflared-tunnel
+    controller: tunnel
+    ports:
+      metrics:
+        port: 2000
+
+serviceMonitor:
+  tunnel:
+    forceRename: cloudflared-tunnel
+    service:
+      identifier: tunnel
+    endpoints:
+      - port: metrics
+        path: /metrics
+
+persistence:
+  config:
+    type: configMap
+    name: cloudflared-config
+    advancedMounts:
+      tunnel:
+        app:
+          - path: /etc/cloudflared
+            readOnly: true

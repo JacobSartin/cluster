@@ -1,0 +1,25 @@
+# The operator only discovers plugins in its own namespace.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: plugin-barman-cloud
+  namespace: cloudnative-pg
+spec:
+  interval: 5m
+  chartRef:
+    kind: OCIRepository
+    name: plugin-barman-cloud
+    namespace: flux-system
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    crds:
+      create: true
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 256Mi

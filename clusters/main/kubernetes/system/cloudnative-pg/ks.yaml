@@ -1,0 +1,80 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudnative-pg
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: prometheus-operator-crds
+  interval: 10m
+  path: clusters/main/kubernetes/system/cloudnative-pg/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster
+  wait: true
+---
+# Retain catalogs still referenced by existing Clusters.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudnative-pg-image-catalog
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cloudnative-pg
+  interval: 1h
+  path: image-catalogs
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: cnpg-artifacts
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudnative-pg-barman-plugin
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cloudnative-pg
+    - name: cert-manager
+  interval: 10m
+  path: clusters/main/kubernetes/system/cloudnative-pg/barman-plugin
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudnative-pg-offsite
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: external-secrets-stores
+  interval: 10m
+  path: clusters/main/kubernetes/system/cloudnative-pg/offsite
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudnative-pg-dashboards
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cloudnative-pg
+    - name: grafana-operator
+  interval: 10m
+  path: clusters/main/kubernetes/system/cloudnative-pg/dashboards
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster

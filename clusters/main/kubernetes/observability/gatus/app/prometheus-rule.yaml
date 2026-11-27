@@ -1,0 +1,18 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gatus
+  namespace: gatus
+spec:
+  groups:
+    - name: gatus
+      rules:
+        - alert: GatusMetricsUnavailable
+          expr: up{namespace="gatus"} == 0 or absent(up{namespace="gatus"})
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Gatus metrics are unavailable
+            description: 'Prometheus has been unable to scrape Gatus, or its target is missing, for five minutes.'

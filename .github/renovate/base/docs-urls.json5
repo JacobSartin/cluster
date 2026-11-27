@@ -1,0 +1,22 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  customManagers: [
+    {
+      customType: "regex",
+      description: "Update versioned documentation links in comments",
+      managerFilePatterns: ["/\\.ya?ml$/"],
+      matchStrings: [
+        "# renovate-docs: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: registryUrl=(?<registryUrl>\\S+))?(?: versioning=(?<versioning>\\S+))?\\s+#[^\\n]*?https?://\\S*?/(?:[^/\\s]*[-_])?v?(?<currentValue>\\d+\\.\\d+\\.\\d+(?:[-+][^/#?\\s]+)?)[/#?\\s]",
+      ],
+      depTypeTemplate: "{{#if registryUrl}}chart-docs{{else}}docs{{/if}}",
+      extractVersionTemplate: "^v?(?<version>.+)$",
+    },
+  ],
+  packageRules: [
+    {
+      description: "Documentation links hold a version only; there is nowhere to pin a digest",
+      matchDepTypes: ["chart-docs", "docs"],
+      pinDigests: false,
+    },
+  ],
+}

@@ -1,0 +1,55 @@
+---
+metrics: true
+storage:
+  type: sqlite
+  path: /data/gatus.db
+  maximum-number-of-results: 1440
+  maximum-number-of-events: 100
+ui:
+  title: Cluster status
+  header: Cluster status
+alerting:
+  discord:
+    webhook-url: "$${GATUS_DISCORD_WEBHOOK_URL}"
+    default-alert:
+      description: Endpoint health check failed
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+endpoints:
+  - name: healthchecks.io heartbeat
+    group: Connectivity
+    url: "$${GATUS_HEALTHCHECKS_PING_URL}"
+    interval: 1m
+    ui:
+      hide-hostname: true
+      hide-url: true
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == OK"
+    alerts:
+      - type: discord
+  - name: Cluster DNS
+    group: DNS
+    url: kube-dns.kube-system.svc.cluster.local:53
+    interval: 1m
+    dns:
+      query-name: kubernetes.default.svc.cluster.local
+      query-type: A
+    conditions:
+      - "[DNS_RCODE] == NOERROR"
+      - "len([BODY]) > 0"
+    alerts:
+      - type: discord
+  - name: Cloudflare DNS
+    group: Connectivity
+    url: 1.1.1.1:53
+    interval: 1m
+    dns:
+      query-name: cloudflare.com
+      query-type: A
+    conditions:
+      - "[DNS_RCODE] == NOERROR"
+      - "len([BODY]) > 0"
+    alerts:
+      - type: discord

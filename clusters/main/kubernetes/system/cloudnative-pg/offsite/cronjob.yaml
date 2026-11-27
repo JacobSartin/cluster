@@ -1,0 +1,126 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cnpg-offsite
+  namespace: cnpg-offsite
+spec:
+  schedule: "23 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: cnpg-offsite
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsUser: 568
+            runAsGroup: 568
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              image: docker.io/rclone/rclone:1.76.0@sha256:7cbeec24a44f206067597c0368be4de90ae19a64d5113c7d1938bd737a81e466
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  : > "$RCLONE_CONFIG"
+                  RCLONE_CONFIG_OFFSITE_PASSWORD="$(printf '%s' "$CRYPT_PASSWORD" | rclone obscure -)"
+                  RCLONE_CONFIG_OFFSITE_PASSWORD2="$(printf '%s' "$CRYPT_SALT" | rclone obscure -)"
+                  export RCLONE_CONFIG_OFFSITE_PASSWORD RCLONE_CONFIG_OFFSITE_PASSWORD2
+                  unset CRYPT_PASSWORD CRYPT_SALT
+                  status=0
+                  for bucket in $BUCKETS; do
+                    echo "== $bucket"
+                    rclone mkdir "rustfs:$bucket" && rclone mkdir "offsite:$bucket" || { status=1; continue; }
+                    rclone copy "rustfs:$bucket" "offsite:$bucket" --min-age 1h --immutable \
+                      --stats-one-line --stats 0 -v || status=1
+                    # Exclude files that aged into the copy window after the run began.
+                    rclone cryptcheck "rustfs:$bucket" "offsite:$bucket" --one-way \
+                      --min-age 2h --max-age 25h || status=1
+                    rclone delete "offsite:$bucket" --min-age 60d -v || status=1
+                  done
+                  exit "$status"
+              env:
+                - name: BUCKETS
+                  value: ${S3BUCKET}-authelia ${S3BUCKET}-grafana-operator ${S3BUCKET}-lldap
+                - name: HOME
+                  value: /tmp
+                - name: RCLONE_CONFIG
+                  value: /tmp/rclone.conf
+                - name: RCLONE_CONFIG_RUSTFS_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_RUSTFS_PROVIDER
+                  value: Other
+                - name: RCLONE_CONFIG_RUSTFS_ENDPOINT
+                  value: http://${RUSTFS_URL}
+                - name: RCLONE_CONFIG_RUSTFS_REGION
+                  value: us-east-1
+                - name: RCLONE_CONFIG_RUSTFS_FORCE_PATH_STYLE
+                  value: "true"
+                - name: RCLONE_CONFIG_RUSTFS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: cnpg-offsite-storage
+                      key: RUSTFS_ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_RUSTFS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cnpg-offsite-storage
+                      key: RUSTFS_SECRET_ACCESS_KEY
+                - name: RCLONE_CONFIG_R2_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_R2_PROVIDER
+                  value: Cloudflare
+                - name: RCLONE_CONFIG_R2_ENDPOINT
+                  value: https://${R2URL}
+                - name: RCLONE_CONFIG_R2_REGION
+                  value: auto
+                - name: RCLONE_CONFIG_R2_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: cnpg-offsite-storage
+                      key: R2_ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_R2_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cnpg-offsite-storage
+                      key: R2_SECRET_ACCESS_KEY
+                - name: RCLONE_CONFIG_OFFSITE_TYPE
+                  value: crypt
+                - name: RCLONE_CONFIG_OFFSITE_REMOTE
+                  value: r2:${S3BUCKET}-cnpg-offsite
+                - name: CRYPT_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: cnpg-offsite
+                      key: crypt-password
+                - name: CRYPT_SALT
+                  valueFrom:
+                    secretKeyRef:
+                      name: cnpg-offsite
+                      key: crypt-salt
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+          volumes:
+            - name: tmp
+              emptyDir: {}

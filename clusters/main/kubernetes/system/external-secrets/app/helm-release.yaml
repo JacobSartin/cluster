@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: external-secrets
+  namespace: external-secrets
+spec:
+  interval: 15m
+  chartRef:
+    kind: OCIRepository
+    name: external-secrets
+    namespace: flux-system
+  timeout: 10m
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    installCRDs: true
+    serviceMonitor:
+      enabled: true
+      # Skip the CRD capability check.
+      renderMode: alwaysRender
+    resources:
+      requests:
+        cpu: 10m
+        memory: 96Mi
+    webhook:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+    certController:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 128Mi

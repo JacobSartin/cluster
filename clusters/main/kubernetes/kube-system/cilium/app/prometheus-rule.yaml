@@ -1,0 +1,61 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cilium
+  namespace: kube-system
+spec:
+  groups:
+    - name: cilium
+      rules:
+        - alert: CiliumNodesUnreachable
+          expr: cilium_unreachable_nodes > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Cilium on {{ $labels.node }} cannot reach {{ $value }} node(s)'
+            description: Node-to-node health checks have failed for 15 minutes. Expected while a node is down; otherwise check cilium-health status and the L2 segment.
+
+        - alert: CiliumControllersFailing
+          expr: cilium_controllers_failing > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Cilium on {{ $labels.node }} has {{ $value }} failing controller(s)'
+            description: An internal agent controller has kept failing for 15 minutes. cilium status --verbose on the agent names it.
+
+        - alert: CiliumPolicyChangeFailed
+          expr: increase(cilium_policy_change_total{outcome="fail"}[30m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Cilium on {{ $labels.node }} failed to apply a policy change'
+            description: A network policy failed to import or apply in the last 30 minutes, so the policy in Git is not the policy enforced. Check the agent logs and the CiliumNetworkPolicy status.
+
+        - alert: CiliumEndpointRegenerationFailed
+          expr: increase(cilium_endpoint_regenerations_total{outcome="fail"}[30m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Cilium on {{ $labels.node }} failed to regenerate an endpoint'
+            description: A pod's datapath failed to regenerate in the last 30 minutes and may be unreachable or unpoliced. Check the agent logs for the endpoint.
+
+        - alert: CiliumBPFMapPressure
+          expr: cilium_bpf_map_pressure > 0.9
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Cilium BPF map {{ $labels.map_name }} on {{ $labels.node }} is {{ $value | humanizePercentage }} full'
+            description: A full map drops new connections or identities. Raise its size in the Cilium values or find what fills it.
+
+        - alert: CiliumMetricsMissing
+          expr: absent(up{namespace="kube-system", service="cilium-agent"} == 1)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Cilium agent metrics are missing
+            description: Prometheus has not seen a healthy cilium-agent target for 15 minutes, so network faults would go unnoticed.

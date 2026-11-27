@@ -1,0 +1,136 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: grafana-loki
+  namespace: grafana-loki
+spec:
+  interval: 15m
+  chartRef:
+    kind: OCIRepository
+    name: loki
+    namespace: flux-system
+  timeout: 20m
+  driftDetection:
+    mode: warn
+  values:
+    deploymentMode: Monolithic
+    defaults:
+      extraEnvFrom:
+        - secretRef:
+            name: loki-s3-credentials
+    loki:
+      auth_enabled: false
+      analytics:
+        reporting_enabled: false
+      server:
+        log_level: info
+      commonConfig:
+        replication_factor: 3
+      compactor:
+        working_directory: /var/loki/compactor/retention
+        delete_request_store: s3
+        retention_enabled: true
+      ingester:
+        chunk_encoding: snappy
+      storage:
+        type: s3
+        bucketNames:
+          chunks: loki-chunks
+          ruler: loki-ruler
+        s3:
+          endpoint: http://${RUSTFS_URL}
+          # Double dollars defer expansion to Loki.
+          accessKeyId: $${LOKI_S3_ACCESS_KEY_ID}
+          secretAccessKey: $${LOKI_S3_SECRET_ACCESS_KEY}
+          s3ForcePathStyle: true
+          insecure: true
+      schemaConfig:
+        configs:
+          - from: "2024-04-01"
+            store: tsdb
+            object_store: s3
+            schema: v13
+            index:
+              prefix: loki_index_
+              period: 24h
+      limits_config:
+        retention_period: 14d
+    singleBinary:
+      # Must be >= loki.commonConfig.replication_factor.
+      replicas: 3
+      # Replaces the chart's required anti-affinity.
+      affinity: null
+      # One per node; a pod runs on another node while its own is down.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: single-binary
+              app.kubernetes.io/instance: grafana-loki
+              app.kubernetes.io/name: loki
+      resources:
+        requests:
+          cpu: 50m
+          memory: 512Mi
+      podDisruptionBudget:
+        unhealthyPodEvictionPolicy: AlwaysAllow
+        maxUnavailable: 1
+      persistence:
+        storageClass: longhorn
+        size: 5Gi
+
+    gateway:
+      # The chart renders this PDB only when a limit is set.
+      replicas: 2
+      deploymentStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 0
+          maxUnavailable: 1
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+      metrics:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+      podDisruptionBudget:
+        maxUnavailable: 1
+
+    sidecar:
+      rules:
+        enabled: false
+
+    monitoring:
+      serviceMonitor:
+        enabled: true
+        interval: 1m
+      alerts:
+        enabled: true
+        # Reads a recording rule from monitoring.rules, which is off.
+        disabled:
+          LokiRequestLatency: true
+        overrides:
+          LokiRequestErrors:
+            severity: warning
+
+    write:
+      replicas: 0
+    read:
+      replicas: 0
+    backend:
+      replicas: 0
+    chunksCache:
+      enabled: false
+    resultsCache:
+      enabled: false
+    lokiCanary:
+      enabled: false
+    test:
+      enabled: false

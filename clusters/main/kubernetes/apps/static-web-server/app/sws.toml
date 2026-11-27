@@ -1,0 +1,13 @@
+
+[advanced]
+
+[[advanced.redirects]]
+host = "www.${BASE_DOMAIN}"
+source = "/{*}"
+destination = "https://${BASE_DOMAIN}/$1"
+kind = 301
+
+[[advanced.headers]]
+source = "**/*.html"
+[advanced.headers.headers]
+Cache-Control = "no-cache"

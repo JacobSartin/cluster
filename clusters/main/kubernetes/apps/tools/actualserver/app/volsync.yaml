@@ -1,0 +1,99 @@
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: actualserver-data-volsync-data
+  namespace: actualserver
+spec:
+  refreshInterval: 1h
+  target:
+    name: actualserver-data-volsync-data
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      type: Opaque
+      data:
+        AWS_ACCESS_KEY_ID: '{{ .r2AccessKeyId }}'
+        AWS_SECRET_ACCESS_KEY: '{{ .r2SecretAccessKey }}'
+        RESTIC_PASSWORD: '{{ if lt (len .resticRoot) 64 }}{{ .resticRootTooShort }}{{ end }}{{ printf "%s:actualserver/actualserver-data-volsync-data" .resticRoot | sha256sum }}'
+        RESTIC_REPOSITORY: s3:https://${R2URL}/${S3BUCKET}-actualserver/actualserver/volsync/data-volsync-data
+  data:
+    - secretKey: r2AccessKeyId
+      sourceRef:
+        storeRef:
+          kind: ClusterSecretStore
+          name: backup
+      remoteRef:
+        key: backup
+        property: r2-access-key-id
+    - secretKey: r2SecretAccessKey
+      sourceRef:
+        storeRef:
+          kind: ClusterSecretStore
+          name: backup
+      remoteRef:
+        key: backup
+        property: r2-secret-access-key
+    - secretKey: resticRoot
+      sourceRef:
+        storeRef:
+          kind: ClusterSecretStore
+          name: backup
+      remoteRef:
+        key: backup
+        property: restic-root
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationDestination
+metadata:
+  name: actualserver-data-data-dest
+  namespace: actualserver
+spec:
+  trigger:
+    manual: restore-bjw-s-common
+  restic:
+    repository: actualserver-data-volsync-data
+    copyMethod: Snapshot
+    capacity: 1Gi
+    cleanupTempPVC: false
+    cleanupCachePVC: false
+    accessModes:
+      - ReadWriteOnce
+    cacheCapacity: 1Gi
+    moverSecurityContext:
+      fsGroup: 568
+      runAsGroup: 568
+      runAsNonRoot: true
+      runAsUser: 568
+      seccompProfile:
+        type: RuntimeDefault
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: actualserver-data-data
+  namespace: actualserver
+spec:
+  sourcePVC: actualserver-data
+  trigger:
+    schedule: 0 0 * * *
+  restic:
+    repository: actualserver-data-volsync-data
+    copyMethod: Snapshot
+    pruneIntervalDays: 7
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 3
+      yearly: 1
+    accessModes:
+      - ReadWriteOnce
+    cacheCapacity: 1Gi
+    moverSecurityContext:
+      fsGroup: 568
+      runAsGroup: 568
+      runAsNonRoot: true
+      runAsUser: 568
+      seccompProfile:
+        type: RuntimeDefault

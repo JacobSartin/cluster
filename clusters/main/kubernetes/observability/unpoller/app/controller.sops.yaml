@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: unpoller-controller
+    namespace: unpoller
+type: Opaque
+stringData:
+    password: ENC[AES256_GCM,data:CyiVrkS5PIjmMXov7xe9V1kzQA==,iv:koMSKG+Dnv2sxK0wLT6pqLPRrnZixM0HNRFwvYr1JDk=,tag:s3jqmzMPlEkxGuED+K2lgQ==,type:str]
+    username: ENC[AES256_GCM,data:JHWtkfYjatA=,iv:SrCWhcoMZMvI4r3SF6d3f+PczDuyKIwNGsiTZu4jLQw=,tag:40bQO+wBDFAhXXZWSsybBg==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1cG1pdm02QTVGRHVtVkZT
+            Q2VNNFlGUFBWdDJrTTgvWVk5cU9VSGNsNzMwCkc4eGhiQ1RjUUhvVWFwVFRqdkgy
+            QXFqRVFpTmxxZlR5am5KSUM4ZzNhNGcKLS0tIHZsWjc2V0VjbXNEMkRjT3B3SHlC
+            RGtYdkNxSm9ucUhWZjZjTFNlU01QQVEKEM0NLkpZxDkb9gqcKRxrbqcn/jCF4nr4
+            jAsIBwc+QHemlyy9kE+UPMOyexpbjn64sscfvJSYLUTrq0YMEayy6w==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1tpc0yytufplgg0gucz7ze52vhx0c0j6lvzctmy0kfg4fhyy444gqedj494
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpTkQzYVV1VVVmbnAwSy9q
+            WjdmVEc0MnpTY1FyOEIrUEwyekJhWUhlT0NBCnpLdVlaY1JEclpFK21nTjZhWnNO
+            QXhySGtJVmFxQnIrSEdOb0N1REs5SDQKLS0tIFhpVlA2OXljc1dkYUtNVVQwNHFQ
+            VCs5SjY4KzJLRDJBVGI1cFVhdDQxSFkKOWZmcbkh7vKEPQP9yKSqQNhvgDFOZdvm
+            PU9bRjc1r0rXjDPE+EQ91r4aovMGrZksdXZzcAM5EbIFXUEr1V6bqQ==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1h8c7nenuf7rn6qjmackxrlt3nvjfyk77mw7ujnrsnnspkcle8s7qjsamhs
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-10-13T22:29:24Z"
+    mac: ENC[AES256_GCM,data:lJW93oree9hHzvHFnYcmSnjQSWUX3UiCRI3sV7Vl1tJIIkODFZsRFAXVyYhBDeV4cWTtpaxNCxMAsTSntxUMXIG+c50R3ODFfuEvL5Rq1xQv8M3WDI90LIC7kI3SLDCgZvr5kdviHFOtASMwnZN6PtWrfPmB/1freBnbkAvxLDw=,iv:RYII3Ve6DEZZCpIT7qJB4MZ5kma5cLHkl8Cw69bsPpU=,tag:ErT+B1HSQNsVTJsZyKvSiA==,type:str]
+    version: 3.13.3

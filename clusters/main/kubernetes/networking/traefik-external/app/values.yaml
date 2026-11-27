@@ -1,0 +1,252 @@
+# renovate-schema: datasource=docker depName=ghcr.io/traefik/helm/traefik registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/traefik/traefik-helm-chart/v43.0.0/traefik/values.schema.json
+---
+core:
+  strictTLSOptions: true
+
+deployment:
+  replicas: 2
+  terminationGracePeriodSeconds: 60
+
+# Update the plugin hash with its version.
+experimental:
+  abortOnPluginFailure: true
+  plugins:
+    cloudflarewarp:
+      moduleName: github.com/PseudoResonance/cloudflarewarp
+      version: v1.4.2
+      hash: 6daac1a108cafc25b09261583f178962c6c9bf927b066afb3661ded598a8a60e
+
+# In place: with a node down, a surge pod has nowhere to go.
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 0
+    maxUnavailable: 1
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: traefik-external-traefik-external
+            app.kubernetes.io/name: traefik
+        topologyKey: kubernetes.io/hostname
+
+ingressClass:
+  enabled: false
+
+gatewayClass:
+  enabled: true
+  name: traefik-external
+  labels:
+    gateway-role: external
+
+providers:
+  kubernetesIngress:
+    enabled: false
+  kubernetesCRD:
+    enabled: true
+    allowCrossNamespace: false
+    defaultTLSResourcesNamespace: traefik-external
+    labelSelector: gateway-role in (external,shared)
+    safeNaming: true
+  kubernetesGateway:
+    enabled: true
+    experimentalChannel: false
+    statusAddress:
+      service:
+        enabled: true
+
+gateway:
+  enabled: true
+  name: external
+  annotations:
+    # Read only by the Cloudflare external-dns instance, through its annotation prefix.
+    cloudflare.external-dns.kubernetes.io/target: ${TUNNEL_ID}.cfargotunnel.com
+    gatus.home-operations.com/endpoint: |
+      group: external
+      alerts:
+        - type: discord
+  # Namespaces that may attach ListenerSets, which bring their own hostname and certificate.
+  allowedListeners:
+    namespaces:
+      from: Selector
+      selector:
+        matchLabels:
+          network.jacobsartin.com/ingress: external
+  listeners:
+    # cloudflared's listener: one for every host, so a pooled connection may carry any of them.
+    tunnel:
+      port: 8444
+      protocol: HTTPS
+      namespacePolicy:
+        from: Selector
+        selector:
+          matchLabels:
+            network.jacobsartin.com/ingress: external
+      certificateRefs:
+        - group: ""
+          kind: Secret
+          name: tunnel-listener-tls
+    web:
+      port: 8000
+      protocol: HTTP
+      namespacePolicy:
+        from: Selector
+        selector:
+          matchLabels:
+            network.jacobsartin.com/ingress: external
+
+tlsOptions:
+  default:
+    labels:
+      gateway-role: external
+    minVersion: VersionTLS12
+
+ports:
+  metrics:
+    http:
+      aliasHeadersStrategy: reject
+  traefik:
+    http:
+      aliasHeadersStrategy: reject
+  # Only on the traefik-external-tunnel Service, not on the LoadBalancer.
+  tunnel:
+    port: 8444
+    expose:
+      default: false
+      tunnel: true
+    exposedPort: 443
+    protocol: TCP
+    http:
+      aliasHeadersStrategy: reject
+      encodedCharacters:
+        allowEncodedSlash: false
+        allowEncodedBackSlash: false
+        allowEncodedNullCharacter: false
+        allowEncodedSemicolon: false
+        allowEncodedPercent: false
+        allowEncodedQuestionMark: false
+        allowEncodedHash: false
+      middlewares:
+        - traefik-external_cloudflarewarp@kubernetescrd
+        - traefik-external_security-headers@kubernetescrd
+        - traefik-external_compress@kubernetescrd
+      tls:
+        enabled: true
+    forwardedHeaders:
+      trustedIPs: []
+    transport:
+      respondingTimeouts:
+        readTimeout: 120s
+        idleTimeout: 120s
+      lifeCycle:
+        graceTimeOut: 30s
+      keepAliveMaxRequests: 10000
+  web:
+    http:
+      aliasHeadersStrategy: reject
+      encodedCharacters:
+        allowEncodedSlash: false
+        allowEncodedBackSlash: false
+        allowEncodedNullCharacter: false
+        allowEncodedSemicolon: false
+        allowEncodedPercent: false
+        allowEncodedQuestionMark: false
+        allowEncodedHash: false
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+    forwardedHeaders:
+      trustedIPs: []
+    transport:
+      respondingTimeouts:
+        readTimeout: 120s
+        idleTimeout: 120s
+      lifeCycle:
+        graceTimeOut: 30s
+      keepAliveMaxRequests: 10000
+  websecure:
+    http:
+      aliasHeadersStrategy: reject
+      encodedCharacters:
+        allowEncodedSlash: false
+        allowEncodedBackSlash: false
+        allowEncodedNullCharacter: false
+        allowEncodedSemicolon: false
+        allowEncodedPercent: false
+        allowEncodedQuestionMark: false
+        allowEncodedHash: false
+      middlewares:
+        - traefik-external_cloudflarewarp@kubernetescrd
+        - traefik-external_security-headers@kubernetescrd
+        - traefik-external_compress@kubernetescrd
+    forwardedHeaders:
+      trustedIPs: []
+    transport:
+      respondingTimeouts:
+        readTimeout: 120s
+        idleTimeout: 120s
+      lifeCycle:
+        graceTimeOut: 30s
+      keepAliveMaxRequests: 10000
+      # Closes connections that predate a host's move to another listener, which get 421.
+      keepAliveMaxTime: 5m
+
+service:
+  annotations:
+    metallb.io/address-pool: main
+  spec:
+    externalTrafficPolicy: Local
+    type: LoadBalancer
+  additionalServices:
+    tunnel:
+      spec:
+        type: ClusterIP
+
+ocsp:
+  enabled: true
+
+log:
+  format: json
+  level: INFO
+
+accessLog:
+  enabled: true
+  format: json
+  fields:
+    headers:
+      names:
+        Cf-Connecting-Ip: keep
+        Cf-Worker: keep
+    queryParameters:
+      defaultMode: drop
+
+metrics:
+  addInternals: true
+  prometheus:
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    service:
+      enabled: true
+    serviceMonitor:
+      enabled: true
+      honorLabels: true
+      interval: 30s
+      additionalLabels:
+        gateway-role: external
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 500Mi

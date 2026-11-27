@@ -1,0 +1,93 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pikvm
+  namespace: external-services
+spec:
+  ports:
+    - name: https
+      protocol: TCP
+      port: 443
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: pikvm
+  namespace: external-services
+  labels:
+    kubernetes.io/service-name: pikvm
+    # Prevent the EndpointSlice controller from replacing manual endpoints.
+    endpointslice.kubernetes.io/managed-by: cluster-gitops
+
+addressType: IPv4
+ports:
+  - name: https
+    protocol: TCP
+    port: 443
+endpoints:
+  - addresses:
+      - "${PIKVM_IP}"
+    conditions:
+      ready: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: pikvm
+  namespace: external-services
+  labels:
+    gateway-role: internal
+spec:
+  insecureSkipVerify: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: TraefikService
+metadata:
+  name: pikvm
+  namespace: external-services
+  labels:
+    gateway-role: internal
+spec:
+  weighted:
+    services:
+      - kind: Service
+        name: pikvm
+        port: 443
+        scheme: https
+        serversTransport: pikvm
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: pikvm
+  namespace: external-services
+  labels:
+    auth.jacobsartin.com/authelia: bypass
+    gateway-role: internal
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/external: "true"
+    gethomepage.dev/group: "External Services"
+    gethomepage.dev/href: "https://kvm.${BASE_DOMAIN}"
+    gethomepage.dev/icon: "pikvm.svg"
+    gethomepage.dev/name: "PiKVM"
+    gethomepage.dev/weight: "10"
+spec:
+  hostnames:
+    - kvm.${BASE_DOMAIN}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: internal
+      namespace: traefik-internal
+      sectionName: websecure
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: traefik.io
+          kind: TraefikService
+          name: pikvm

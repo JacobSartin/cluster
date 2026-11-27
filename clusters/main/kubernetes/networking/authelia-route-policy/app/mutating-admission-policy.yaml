@@ -1,0 +1,86 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/v1.36.0/mutatingadmissionpolicy-admissionregistration-v1.json
+# Double dollars defer expansion to Gatus.
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: authelia-route
+spec:
+  failurePolicy: Fail
+  reinvocationPolicy: IfNeeded
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        auth.jacobsartin.com/authelia: enabled
+    resourceRules:
+      - apiGroups: ["gateway.networking.k8s.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["httproutes"]
+  matchConditions:
+    - name: not-bypassed
+      expression: >-
+        object.metadata.?labels["auth.jacobsartin.com/authelia"].orValue("") != "bypass"
+  variables:
+    - name: filter
+      expression: >-
+        {
+          "type": dyn("ExtensionRef"),
+          "extensionRef": dyn({"group": "traefik.io", "kind": "Middleware", "name": "authelia"})
+        }
+    - name: endpointKey
+      expression: >-
+        "gatus.home-operations.com/endpoint"
+    - name: probed
+      expression: >-
+        object.metadata.?annotations["gatus.home-operations.com/enabled"].orValue("") != "false"
+    - name: path
+      expression: >-
+        object.metadata.?annotations["auth.jacobsartin.com/gatus-path"].orValue("")
+    - name: endpoint
+      expression: |-
+        (variables.path == "" ? "" : "path: " + variables.path + "\n") +
+          "headers:\n  Proxy-Authorization: Basic $${GATUS_AUTHELIA_BASIC}\n"
+  mutations:
+    - patchType: JSONPatch
+      jsonPatch:
+        expression: |-
+          object.spec.?rules.orValue([]).transformList(i, rule,
+            !rule.?filters.orValue([]).exists(f,
+              f.?type.orValue("") == "ExtensionRef" &&
+              f.?extensionRef.?group.orValue("") == "traefik.io" &&
+              f.?extensionRef.?kind.orValue("") == "Middleware" &&
+              f.?extensionRef.?name.orValue("") == "authelia"),
+            has(rule.filters)
+              ? JSONPatch{
+                  op: "add",
+                  path: "/spec/rules/" + string(i) + "/filters/0",
+                  value: variables.filter
+                }
+              : JSONPatch{
+                  op: "add",
+                  path: "/spec/rules/" + string(i) + "/filters",
+                  value: [variables.filter]
+                }
+          ) + (
+            !variables.probed ? [] :
+            has(object.metadata.annotations)
+              ? [JSONPatch{
+                  op: "add",
+                  path: "/metadata/annotations/" + jsonpatch.escapeKey(variables.endpointKey),
+                  value: variables.endpoint
+                }]
+              : [JSONPatch{
+                  op: "add",
+                  path: "/metadata/annotations",
+                  value: {variables.endpointKey: variables.endpoint}
+                }]
+          )
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/v1.36.0/mutatingadmissionpolicybinding-admissionregistration-v1.json
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: authelia-route
+spec:
+  policyName: authelia-route

@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - certificate.yaml
+  - network-policy.yaml
+  - helm-release.yaml
+  - secret.sops.yaml
+  - env.secret.sops.yaml
+  - storage-key.sops.yaml
+  - session-secrets.yaml
+  - valkey-secret.yaml
+  - cnpg
+
+components:
+  - ../../../../../components/lldap/service-account-readonly
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: authelia-configfile
+    namespace: authelia
+    files:
+      - configuration.yaml=authelia-config.yaml
+  - name: authelia-valkey-scripts
+    namespace: authelia
+    files:
+      - valkey.sh
+    options:
+      annotations:
+        # Disable Flux substitution for shell expansions.
+        kustomize.toolkit.fluxcd.io/substitute: disabled
+  - name: authelia-values
+    namespace: authelia
+    files:
+      - values.yaml
+    options:
+      labels:
+        reconcile.fluxcd.io/watch: Enabled

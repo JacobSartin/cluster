@@ -1,0 +1,31 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cert-manager
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: prometheus-operator-crds
+  interval: 10m
+  path: clusters/main/kubernetes/system/cert-manager/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cert-manager-dashboards
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cert-manager
+    - name: grafana-operator
+  interval: 10m
+  path: clusters/main/kubernetes/system/cert-manager/dashboards
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster

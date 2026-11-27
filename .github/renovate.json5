@@ -1,0 +1,11 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "github>JacobSartin/cluster//.github/renovate/base.json5",
+    "github>JacobSartin/cluster//.github/renovate/cluster/raw-manifests.json5",
+    "github>JacobSartin/cluster//.github/renovate/cluster/flux-instance.json5",
+    "github>JacobSartin/cluster//.github/renovate/cluster/cloudnative-pg.json5",
+    "github>JacobSartin/cluster//.github/renovate/cluster/actions-runners.json5",
+    "github>JacobSartin/cluster//.github/renovate/cluster/prometheus-operator.json5",
+  ],
+}

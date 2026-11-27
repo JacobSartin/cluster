@@ -1,0 +1,19 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cert-manager.io/certificate_v1.json
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: webhook-receiver-gateway
+  namespace: flux-system
+spec:
+  secretName: webhook-receiver-gateway-tls
+  dnsNames:
+    - flux-webhook.${BASE_DOMAIN}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    name: prod
+    kind: ClusterIssuer
+    group: cert-manager.io

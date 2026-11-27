@@ -1,0 +1,20 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cert-manager.io/certificate_v1.json
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: static-web-server-gateway
+  namespace: static-web-server
+spec:
+  secretName: static-web-server-gateway-tls
+  dnsNames:
+    - ${BASE_DOMAIN}
+    - www.${BASE_DOMAIN}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    name: prod
+    kind: ClusterIssuer
+    group: cert-manager.io

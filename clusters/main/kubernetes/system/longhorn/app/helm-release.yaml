@@ -1,0 +1,85 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: longhorn
+  namespace: longhorn-system
+spec:
+  interval: 5m
+  chartRef:
+    kind: OCIRepository
+    name: longhorn
+    namespace: flux-system
+  releaseName: longhorn
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    defaultSettings:
+      # Create default disks only on explicitly configured nodes.
+      createDefaultDiskLabeledNodes: true
+      # Must match persistence.defaultClassReplicaCount.
+      defaultReplicaCount: "2"
+      storageOverProvisioningPercentage: "100"
+      # renovate-docs: datasource=docker depName=ghcr.io/home-operations/charts-mirror/longhorn registryUrl=https://ghcr.io
+      # https://longhorn.io/docs/1.13.0/maintenance/maintenance/#node-drain-policy-recommendations
+      nodeDrainPolicy: "allow-if-replica-is-stopped"
+      replicaReplenishmentWaitInterval: "1800"
+      concurrentReplicaRebuildPerNodeLimit: "4"
+      allowInstanceManagerAutomaticUpgrade: '{"v2":"true"}'
+      v1DataEngine: false
+      v2DataEngine: true
+      dataEngineInterruptModeEnabled: '{"v2":"true"}'
+      # Match the node's instanceManagerCPURequest.
+      dataEngineCPUMask: '{"v2":"0x3"}'
+      snapshotDataIntegrityImmediateCheckAfterSnapshotCreation: '{"v1":"true","v2":"false"}'
+      removeSnapshotsDuringFilesystemTrim: false
+      nodeDownPodDeletionPolicy: "delete-both-statefulset-and-deployment-pod"
+      detachManuallyAttachedVolumesWhenCordoned: true
+    persistence:
+      defaultClass: true
+      defaultClassReplicaCount: "2"
+      defaultDataLocality: disabled
+      dataEngine: v2
+    # CSI sidecars roll with maxUnavailable: 1.
+    csi:
+      podAntiAffinityPreset: hard
+      attacherReplicaCount: 2
+      provisionerReplicaCount: 2
+      resizerReplicaCount: 2
+      snapshotterReplicaCount: 2
+    longhornManager:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+    longhornGlobalManager:
+      replicas: 2
+      resources:
+        requests:
+          cpu: 10m
+          memory: 96Mi
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: longhorn-global-manager
+              topologyKey: kubernetes.io/hostname
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+    longhornUI:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: longhorn-ui
+              topologyKey: kubernetes.io/hostname
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+    metrics:
+      serviceMonitor:
+        enabled: true

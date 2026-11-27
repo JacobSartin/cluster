@@ -1,0 +1,19 @@
+---
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - network-policy.yaml
+replacements:
+  - source:
+      kind: Namespace
+      fieldPath: metadata.name
+    targets:
+      - select:
+          group: cilium.io
+          version: v2
+          kind: CiliumNetworkPolicy
+          name: codeserver-ingress
+        fieldPaths:
+          - metadata.namespace
+        options:
+          create: true

@@ -1,0 +1,37 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  customManagers: [
+    {
+      customType: "regex",
+      description: "Update versioned Helm values schema URLs",
+      // Double backslashes in JSON5 regex strings.
+      managerFilePatterns: ["/(^|/)values\\.ya?ml$/"],
+      matchStrings: [
+        "# renovate-schema: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) registryUrl=(?<registryUrl>\\S+)\\s+# yaml-language-server: \\$schema=\\S*?/(?:[^/\\s]*[-_])?v?(?<currentValue>\\d+\\.\\d+\\.\\d+(?:[-+][^/\\s]+)?)/",
+      ],
+      depTypeTemplate: "helm-values-schema",
+      versioningTemplate: "helm",
+    },
+  ],
+  packageRules: [
+    {
+      description: "Group Docker dependencies and their versioned schemas, dashboards and docs links by package",
+      matchDatasources: ["docker"],
+      groupName: "{{{packageName}}} image and schema",
+      separateMinorPatch: false,
+    },
+    {
+      description: "Group each Helm chart with its versioned values schemas and docs links",
+      matchManagers: ["flux", "custom.regex"],
+      matchDatasources: ["helm", "docker"],
+      matchJsonata: [
+        "depType in ['helm-values-schema', 'chart-docs'] or (manager = 'flux' and (datasource = 'helm' or $contains(packageFile, 'repositories/oci/')))",
+      ],
+      groupName: "{{{datasource}}} {{{packageName}}} chart and schema",
+      branchPrefix: "renovate/flux-",
+      separateMinorPatch: false,
+      versioning: "helm",
+      pinDigests: false,
+    },
+  ],
+}

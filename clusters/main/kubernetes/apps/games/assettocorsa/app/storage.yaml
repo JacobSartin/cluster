@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: assettocorsa-manager-state
+  namespace: assettocorsa
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/external-secrets.io/externalsecret_v1.json
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: assettocorsa-manager-restic
+  namespace: assettocorsa
+spec:
+  refreshInterval: 1h
+  target:
+    name: assettocorsa-manager-restic
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      type: Opaque
+      data:
+        AWS_ACCESS_KEY_ID: "{{ .rustfsAccessKeyId }}"
+        AWS_SECRET_ACCESS_KEY: "{{ .rustfsSecretAccessKey }}"
+        RESTIC_PASSWORD: '{{ if lt (len .resticRoot) 64 }}{{ .resticRootTooShort }}{{ end }}{{ printf "%s:assettocorsa/assettocorsa-manager-restic" .resticRoot | sha256sum }}'
+        RESTIC_REPOSITORY: "s3:http://${RUSTFS_URL}/assettocorsa-manager-state"
+  data:
+    - secretKey: rustfsAccessKeyId
+      sourceRef:
+        storeRef:
+          kind: ClusterSecretStore
+          name: rustfs-credentials
+      remoteRef:
+        key: rustfs-credentials
+        property: access-key-id
+    - secretKey: rustfsSecretAccessKey
+      sourceRef:
+        storeRef:
+          kind: ClusterSecretStore
+          name: rustfs-credentials
+      remoteRef:
+        key: rustfs-credentials
+        property: secret-access-key
+    - secretKey: resticRoot
+      sourceRef:
+        storeRef:
+          kind: ClusterSecretStore
+          name: backup
+      remoteRef:
+        key: backup
+        property: restic-root
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: assettocorsa-manager-state
+  namespace: assettocorsa
+spec:
+  sourcePVC: assettocorsa-manager-state
+  trigger:
+    schedule: 0 0 * * *
+  restic:
+    repository: assettocorsa-manager-restic
+    copyMethod: Snapshot
+    pruneIntervalDays: 7
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 3
+      yearly: 1
+    accessModes: [ReadWriteOnce]
+    cacheCapacity: 1Gi
+    moverSecurityContext:
+      fsGroup: 568
+      runAsGroup: 568
+      runAsNonRoot: true
+      runAsUser: 568
+      seccompProfile:
+        type: RuntimeDefault

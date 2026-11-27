@@ -1,0 +1,27 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: grafana-loki
+  namespace: grafana-loki
+spec:
+  groups:
+    - name: grafana-loki
+      rules:
+        - alert: LokiObjectStorageErrors
+          expr: sum by (job, operation) (rate(loki_s3_request_duration_seconds_count{namespace="grafana-loki",status_code!~"2..|404"}[5m])) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: '{{ $labels.job }} gets errors from the object store on {{ $labels.operation }}'
+            description: S3 requests have failed for 15 minutes. Check RustFS and the loki-s3-credentials Secret; chunks stay on the Loki pods until uploads succeed.
+
+        - alert: LokiMetricsMissing
+          expr: absent(up{job="grafana-loki/grafana-loki"} == 1)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Loki metrics are missing
+            description: Prometheus has not seen a healthy Loki target for 15 minutes, so ingestion failures would go unnoticed.

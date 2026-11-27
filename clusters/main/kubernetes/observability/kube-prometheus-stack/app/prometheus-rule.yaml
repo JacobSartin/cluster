@@ -1,0 +1,78 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: node-hardware
+  namespace: kube-prometheus-stack
+spec:
+  groups:
+    - name: node.hardware
+      rules:
+        - alert: NodeCpuPackageHot
+          # Intel coretemp package (TjMax 100-110 °C on the NUCs); AMD k10temp Tctl (5700G TjMax 95 °C).
+          expr: |
+            (
+              avg_over_time(node_hwmon_temp_celsius{sensor="temp1"}[30m])
+                * on (instance, chip) group_left (chip_name)
+                  max by (instance, chip, chip_name) (node_hwmon_chip_names{chip_name="coretemp"})
+              > 95
+            )
+            or
+            (
+              avg_over_time(node_hwmon_temp_celsius{sensor="temp1"}[30m])
+                * on (instance, chip) group_left (chip_name)
+                  max by (instance, chip, chip_name) (node_hwmon_chip_names{chip_name="k10temp"})
+              > 94
+            )
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'CPU package on {{ $labels.kubernetes_node }} averages {{ $value | printf "%.0f" }} °C'
+            description: The 30-minute average package temperature has stayed at its limit for 30 minutes (above 95 °C on Intel, 94 °C on the AMD node). Check the unit's fan, vents and placement before it throttles or fails.
+
+        - alert: NodeCpuPackageThrottling
+          expr: sum by (instance, kubernetes_node) (rate(node_cpu_package_throttles_total[15m])) > 1
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: 'CPU package on {{ $labels.kubernetes_node }} throttles {{ $value | printf "%.0f" }} times a second'
+            description: The CPU has hit its thermal limit more than once a second for an hour. Healthy nodes stay below 1 per second; check the unit's cooling.
+
+        - alert: NodeMemoryHot
+          # DDR5 SPD5118 sensors; their 55 °C high limit is a register default, not a rating.
+          expr: |
+            node_hwmon_temp_celsius
+              * on (instance, chip) group_left (chip_name)
+                max by (instance, chip, chip_name) (node_hwmon_chip_names{chip_name="spd5118"})
+            > 75
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'DIMM {{ $labels.chip }} on {{ $labels.kubernetes_node }} is at {{ $value | printf "%.0f" }} °C'
+            description: The memory module has stayed above 75 °C for 30 minutes, 10 °C below its critical limit. Check the unit's cooling.
+
+        - alert: NodeMemoryCritical
+          expr: |
+            node_hwmon_temp_celsius
+              * on (instance, chip) group_left (chip_name)
+                max by (instance, chip, chip_name) (node_hwmon_chip_names{chip_name="spd5118"})
+            > on (instance, chip, sensor) group_left
+              max by (instance, chip, sensor) (node_hwmon_temp_crit_celsius)
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'DIMM {{ $labels.chip }} on {{ $labels.kubernetes_node }} is at {{ $value | printf "%.0f" }} °C, above its critical limit'
+            description: The memory module has stayed above its sensor's critical limit (85 °C) for 10 minutes. Drain the node and fix its cooling before the hardware fails.
+
+        - alert: NodeNvmeHot
+          # Composite sensor of real drives; Longhorn's ctl_nvme* chips read -273 °C.
+          expr: node_hwmon_temp_celsius{chip=~"nvme_.*",sensor="temp1"} > 70
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'NVMe drive {{ $labels.chip }} on {{ $labels.kubernetes_node }} is at {{ $value | printf "%.0f" }} °C'
+            description: The drive's composite temperature has stayed above 70 °C for 30 minutes. Check the unit's airflow over the drive.

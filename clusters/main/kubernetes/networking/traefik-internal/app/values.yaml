@@ -1,0 +1,185 @@
+# renovate-schema: datasource=docker depName=ghcr.io/traefik/helm/traefik registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/traefik/traefik-helm-chart/v43.0.0/traefik/values.schema.json
+---
+core:
+  strictTLSOptions: true
+
+deployment:
+  replicas: 2
+  terminationGracePeriodSeconds: 60
+
+# In place: with a node down, a surge pod has nowhere to go.
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 0
+    maxUnavailable: 1
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: traefik-internal-traefik-internal
+            app.kubernetes.io/name: traefik
+        topologyKey: kubernetes.io/hostname
+
+ingressClass:
+  enabled: false
+
+gatewayClass:
+  enabled: true
+  name: traefik-internal
+  labels:
+    gateway-role: internal
+
+providers:
+  kubernetesIngress:
+    enabled: false
+  kubernetesCRD:
+    enabled: true
+    allowCrossNamespace: false
+    defaultTLSResourcesNamespace: traefik-internal
+    labelSelector: gateway-role in (internal,shared)
+    safeNaming: true
+  kubernetesGateway:
+    enabled: true
+    experimentalChannel: false
+    crossProviderNamespaces:
+      - external-services
+    statusAddress:
+      service:
+        enabled: true
+
+gateway:
+  enabled: true
+  name: internal
+  annotations:
+    gatus.home-operations.com/endpoint: |
+      group: internal
+      client:
+        dns-resolver: tcp://blocky-dns.blocky.svc.cluster.local:53
+      alerts:
+        - type: discord
+  listeners:
+    web:
+      port: 8000
+      protocol: HTTP
+      namespacePolicy:
+        from: All
+    websecure:
+      port: 8443
+      protocol: HTTPS
+      namespacePolicy:
+        from: All
+      certificateRefs:
+        - group: ""
+          kind: Secret
+          name: certificate-issuer-wildcard
+          namespace: clusterissuer
+
+tlsOptions:
+  default:
+    labels:
+      gateway-role: internal
+    minVersion: VersionTLS12
+
+ports:
+  metrics:
+    http:
+      aliasHeadersStrategy: reject
+  traefik:
+    http:
+      aliasHeadersStrategy: reject
+  web:
+    http:
+      aliasHeadersStrategy: reject
+      encodedCharacters:
+        allowEncodedSlash: false
+        allowEncodedBackSlash: false
+        allowEncodedNullCharacter: false
+        allowEncodedSemicolon: false
+        allowEncodedPercent: false
+        allowEncodedQuestionMark: false
+        allowEncodedHash: false
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+    forwardedHeaders:
+      trustedIPs: []
+    transport:
+      respondingTimeouts:
+        readTimeout: 120s
+        idleTimeout: 120s
+      lifeCycle:
+        graceTimeOut: 30s
+      keepAliveMaxRequests: 10000
+  websecure:
+    http:
+      aliasHeadersStrategy: reject
+      encodedCharacters:
+        allowEncodedSlash: false
+        allowEncodedBackSlash: false
+        allowEncodedNullCharacter: false
+        allowEncodedSemicolon: false
+        allowEncodedPercent: false
+        allowEncodedQuestionMark: false
+        allowEncodedHash: false
+    forwardedHeaders:
+      trustedIPs: []
+    transport:
+      respondingTimeouts:
+        readTimeout: 120s
+        idleTimeout: 120s
+      lifeCycle:
+        graceTimeOut: 30s
+      keepAliveMaxRequests: 10000
+
+service:
+  annotations:
+    metallb.io/address-pool: main
+  spec:
+    externalTrafficPolicy: Local
+    type: LoadBalancer
+
+ocsp:
+  enabled: true
+
+log:
+  format: json
+  level: INFO
+
+accessLog:
+  enabled: true
+  format: json
+  fields:
+    queryParameters:
+      defaultMode: drop
+
+metrics:
+  addInternals: true
+  prometheus:
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    service:
+      enabled: true
+    serviceMonitor:
+      enabled: true
+      honorLabels: true
+      interval: 30s
+      additionalLabels:
+        gateway-role: internal
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 500Mi

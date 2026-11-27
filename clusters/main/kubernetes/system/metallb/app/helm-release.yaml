@@ -1,0 +1,28 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: metallb
+  namespace: metallb
+spec:
+  interval: 5m
+  chartRef:
+    kind: OCIRepository
+    name: metallb
+    namespace: flux-system
+  values:
+    prometheus:
+      serviceAccount: kube-prometheus-stack-prometheus
+      namespace: kube-prometheus-stack
+      serviceMonitor:
+        enabled: true
+    speaker:
+      ignoreExcludeLB: true
+      resources:
+        requests:
+          cpu: 10m
+          memory: 112Mi
+    controller:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 160Mi

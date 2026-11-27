@@ -1,0 +1,45 @@
+# Keeps PVC updates that leave the size unchanged from depending on Longhorn's webhook.
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: longhorn-pvc-webhook-match
+spec:
+  failurePolicy: Fail
+  reinvocationPolicy: IfNeeded
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["admissionregistration.k8s.io"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["validatingwebhookconfigurations"]
+        resourceNames: ["longhorn-webhook-validator"]
+  matchConditions:
+    - name: longhorn-validator-present
+      expression: object.webhooks.exists(w, w.name == "validator.longhorn.io")
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >-
+          Object{
+            webhooks: [Object.webhooks{
+              name: "validator.longhorn.io",
+              matchConditions: [Object.webhooks.matchConditions{
+                name: "pvc-storage-size-changed",
+                expression:
+                  'request.resource.group != "" || ' +
+                  'request.resource.resource != "persistentvolumeclaims" || ' +
+                  'request.operation != "UPDATE" || oldObject == null || ' +
+                  '!has(object.spec.resources.requests.storage) || ' +
+                  '!has(oldObject.spec.resources.requests.storage) || ' +
+                  'quantity(object.spec.resources.requests.storage).compareTo(' +
+                  'quantity(oldObject.spec.resources.requests.storage)) != 0'
+              }]
+            }]
+          }
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: longhorn-pvc-webhook-match
+spec:
+  policyName: longhorn-pvc-webhook-match

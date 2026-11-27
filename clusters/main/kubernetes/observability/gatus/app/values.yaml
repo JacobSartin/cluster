@@ -1,0 +1,198 @@
+---
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+controllers:
+  gatus:
+    type: deployment
+    forceRename: gatus
+    annotations:
+      configmap.reloader.stakater.com/reload: gatus-config
+      secret.reloader.stakater.com/reload: gatus-discord-webhook,gatus-healthchecks,lldap-service-account
+
+    replicas: 1
+
+    strategy: Recreate
+
+    serviceAccount:
+      name: gatus
+    pod:
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 568
+        runAsNonRoot: true
+        runAsUser: 568
+        seccompProfile:
+          type: RuntimeDefault
+
+      automountServiceAccountToken: true
+
+    containers:
+      app:
+        image:
+          repository: ghcr.io/twin/gatus
+          tag: v5.38.0@sha256:085ed63da963728965d00a3c78aa6167e3bf135218485b893201758e079e8415
+
+        env:
+          TZ: ${TZ}
+          GATUS_CONFIG_PATH: /config
+          GATUS_DELAY_START_SECONDS: "10"
+          GATUS_DISCORD_WEBHOOK_URL:
+            valueFrom:
+              secretKeyRef:
+                name: gatus-discord-webhook
+                key: address
+          GATUS_HEALTHCHECKS_PING_URL:
+            valueFrom:
+              secretKeyRef:
+                name: gatus-healthchecks
+                key: ping-url
+          GATUS_AUTHELIA_BASIC:
+            valueFrom:
+              secretKeyRef:
+                name: lldap-service-account
+                key: basic
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /health
+                port: 8080
+              periodSeconds: 5
+              failureThreshold: 30
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /health
+                port: 8080
+              periodSeconds: 10
+              timeoutSeconds: 3
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /health
+                port: 8080
+              periodSeconds: 10
+              timeoutSeconds: 3
+              failureThreshold: 3
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+          readOnlyRootFilesystem: true
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+
+      discovery:
+        image:
+          repository: ghcr.io/home-operations/gatus-sidecar
+          tag: 0.6.1@sha256:c2b24374a8a4c5551c0122f3a7ae383ff65a0ea0bcd3b541530db84490fea2af
+
+        args:
+          - --output=/config/gatus-sidecar.yaml
+          - --enable-service=true
+          - --enable-ingress=true
+          - --enable-httproute=true
+          - --auto-service=false
+          - --auto-ingress=true
+          - --auto-httproute=true
+          - --prefix-ingress=ingress/
+          - --prefix-httproute=route/
+          - --prefix-service=service/
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+          readOnlyRootFilesystem: true
+
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+
+service:
+  app:
+    controller: gatus
+    ports:
+      http:
+        port: 8080
+
+route:
+  app:
+    kind: HTTPRoute
+    labels:
+      gateway-role: internal
+    annotations:
+      gatus.home-operations.com/enabled: "false"
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/name: "Gatus"
+      gethomepage.dev/group: "Metrics"
+      gethomepage.dev/icon: "gatus.svg"
+      gethomepage.dev/href: "https://gatus.${BASE_DOMAIN}"
+      gethomepage.dev/weight: "20"
+      gethomepage.dev/widget.type: "gatus"
+      gethomepage.dev/widget.url: "http://gatus.gatus.svc.cluster.local:8080"
+    hostnames:
+      - gatus.${BASE_DOMAIN}
+    parentRefs:
+      - group: gateway.networking.k8s.io
+        kind: Gateway
+        name: internal
+        namespace: traefik-internal
+        sectionName: websecure
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        backendRefs:
+          - identifier: app
+            port: http
+
+persistence:
+  generated:
+    type: emptyDir
+    globalMounts:
+      - path: /config
+
+  config:
+    type: configMap
+    name: gatus-config
+    advancedMounts:
+      gatus:
+        app:
+          - path: /config/config.yaml
+            subPath: config.yaml
+            readOnly: true
+
+  data:
+    type: persistentVolumeClaim
+    storageClass: longhorn
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    retain: true
+    advancedMounts:
+      gatus:
+        app:
+          - path: /data
+
+  tmp:
+    type: emptyDir
+    globalMounts:
+      - path: /tmp

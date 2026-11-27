@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: assettocorsa-steam
+    namespace: assettocorsa
+type: Opaque
+stringData:
+    username: ENC[AES256_GCM,data:Tw42KPo8HrxCVyn8Ug==,iv:0RWMcdmLSVtTK2OvdakOYSBQ4lMcTiHov21JzQmMLac=,tag:VH7DXfW/mVrTmYIeRE9EeQ==,type:str]
+    password: ENC[AES256_GCM,data:lvAd28nR9pcHlPoH6XPdkr3worA=,iv:sTHJBc9BMFIz0jzrr/HHjXq9+d0knEEo1Uk1j7mS7XI=,tag:4gBM8VocHWYEdVyGJ4eUvA==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBDUUdjNCtoNmdxWjlYdHhJ
+            ZkF5clY3KzJ2ZkJNZTREeUZIc0FZRGZtREFnCjl5STVneFFPeCtGVXBBOHlpTnN5
+            eUR3WE1NbHhYZzI0WVdocW1TOHBIdDgKLS0tIGV0ZDRBSW9YVVppWUo5TUg5T0ZV
+            ZkNOV3pzb0V4NUpwRGJCR1lldW1UcXcKD1MZWXTBUL5bAFMIczhJhi3IfaI2kbP6
+            M+0rTCE+tARtvs7g5bsusP/aHLse06ciejqRk25VOES/SSWSSnS6GA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1tpc0yytufplgg0gucz7ze52vhx0c0j6lvzctmy0kfg4fhyy444gqedj494
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpWUtrVUR4dCsrUXo4Qm4x
+            R1ZEM2NORkQxdmNLTzdacklDKzhhQURUSndvClNtNU1GRklLTHU0Zjh5anB5emtL
+            NG5oRzlJTkk2RTBSclFrYzkyYm1OencKLS0tIFBJZHlpOWFhV1B6VGYxTnJ3SEMr
+            UGlLRVVLM0VqVWpJRmJCcTBxK1N2TkEKuIM0DH5SbER1GNuhwDmoiKWJ+hb+tfbO
+            DbEfpcSFKF143D903ydrn6MQHTkitHY9F/zFJjjoVbIDTYf+meaNdA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1h8c7nenuf7rn6qjmackxrlt3nvjfyk77mw7ujnrsnnspkcle8s7qjsamhs
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-10-13T22:29:20Z"
+    mac: ENC[AES256_GCM,data:C8oszCZvau5+YhnKkx+5QLEDGew1edq8/l6GBYSa5a1l6h3GWrB32NbSOWNk/hUpMNPaDnEThSck0+Iyg/uGct7wx0IMSphf2Uvps5UOpyrCBwZFgjf3FP/WFluwO/Sa4zW/CyNY6K0Sdy6QF+pvCvj3IPk9qKcTQDA5UVb59tA=,iv:xkR68xssftiBNiwoJ2+HjS1zLjlGx1YFo1tNu3WMBxs=,tag:ZvItlj8OUwkRbvWAkdA1NA==,type:str]
+    version: 3.13.3

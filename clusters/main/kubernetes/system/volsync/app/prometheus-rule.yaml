@@ -1,0 +1,27 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: volsync
+  namespace: volsync
+spec:
+  groups:
+    - name: volsync
+      rules:
+        - alert: VolSyncVolumeOutOfSync
+          expr: volsync_volume_out_of_sync{role="source"} == 1
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'VolSync backup {{ $labels.obj_namespace }}/{{ $labels.obj_name }} is out of sync'
+            description: 'The ReplicationSource missed its schedule or its last sync failed, for 30 minutes. Check the volsync-src job pods in {{ $labels.obj_namespace }}.'
+
+        - alert: VolSyncMetricsMissing
+          expr: absent(up{job="volsync-metrics"} == 1)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: VolSync metrics are missing
+            description: Prometheus has not seen a healthy VolSync target for 15 minutes, so failed backups would go unnoticed.

@@ -1,0 +1,45 @@
+---
+# CI stand-ins for the SOPS substitution Secrets in clusters/main/secrets, so Flux substitution runs
+# during the Flate render. Keep every key: Flate empties variables missing here.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-settings
+  namespace: flux-system
+stringData:
+  GATEWAY: 192.0.2.1
+  NAS_IP: 192.0.2.10
+  NAS_GAMES_PATH: /mnt/example/games
+  NAS_BACKUPS_PATH: /mnt/example/backups
+  PIKVM_IP: 192.0.2.11
+  IPMI_IP: 192.0.2.12
+  PROXMOX_IP: 192.0.2.13
+  BASE_DOMAIN: example.invalid
+  EMAIL: admin@example.invalid
+  SMTP_HOST: smtp.example.invalid
+  SMTP_USER: smtp@example.invalid
+  TZ: Etc/UTC
+  LDAP_BASE_DN: dc=example,dc=invalid
+  LDAP_USER_DN: admin
+  GRAFANA_OIDC_CLIENT_ID: grafana
+  HOMEPAGE_OIDC_CLIENT_ID: homepage
+  RUSTFS_OIDC_CLIENT_ID: rustfs
+  PRIVATE_OIDC_CLIENT_ID: private
+  PRIVATE_OIDC_CLIENT_NAME: Private
+  PRIVATE_OIDC_NAMESPACE: private-system
+  PRIVATE_OIDC_REDIRECT_URI: https://private.example.invalid/oauth2/callback
+  DISCORD_SERVER_ID: "100000000000000000"
+  RUSTFS_URL: 192.0.2.10:30292
+  PODNET: 10.244.0.0/16
+  LAN_NETWORKS: 192.0.2.0/24
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: metallb-pools
+  namespace: flux-system
+stringData:
+  METALLB_POOL_MAIN: 192.0.2.32/28
+  METALLB_POOL_DNS: 192.0.2.48/32
+  METALLB_POOL_GAMES: 192.0.2.64/28
+  METALLB_POOL_PRIVATE: 192.0.2.80/28

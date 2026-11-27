@@ -1,0 +1,97 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumclusterwidenetworkpolicy_v2.json
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: entry-point-egress
+spec:
+  endpointSelector:
+    matchExpressions:
+      - key: io.cilium.k8s.namespace.labels.network.jacobsartin.com/egress
+        operator: In
+        values:
+          - entry-point
+          - entry-point-api
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    - toCIDRSet:
+        - cidr: 0.0.0.0/0
+          except:
+            - 10.0.0.0/8
+            - 172.16.0.0/12
+            - 192.168.0.0/16
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumclusterwidenetworkpolicy_v2.json
+# The namespaces the rustfs-credentials ClusterSecretStore serves; keep the two lists in step.
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: entry-point-egress-rustfs
+
+specs:
+  - endpointSelector:
+      matchExpressions:
+        - key: io.cilium.k8s.namespace.labels.network.jacobsartin.com/egress
+          operator: In
+          values:
+            - entry-point
+            - entry-point-api
+        - key: k8s:io.kubernetes.pod.namespace
+          operator: In
+          values:
+            - assettocorsa
+            - authelia
+            - cnpg-offsite
+            - factorio
+    egress:
+      # Keep the port literal; Flux substitution drops its YAML quotes.
+      - toCIDR:
+          - ${RUSTFS_URL%%:*}/32
+        toPorts:
+          - ports:
+              - port: "30292"
+                protocol: TCP
+  - endpointSelector:
+      matchExpressions:
+        - key: io.cilium.k8s.namespace.labels.network.jacobsartin.com/egress
+          operator: In
+          values:
+            - entry-point
+            - entry-point-api
+        - key: io.cilium.k8s.namespace.labels.capsule.clastix.io/tenant
+          operator: In
+          values:
+            - private
+    egress:
+      - toCIDR:
+          - ${RUSTFS_URL%%:*}/32
+        toPorts:
+          - ports:
+              - port: "30292"
+                protocol: TCP
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumclusterwidenetworkpolicy_v2.json
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: entry-point-egress-api
+spec:
+  endpointSelector:
+    matchLabels:
+      io.cilium.k8s.namespace.labels.network.jacobsartin.com/egress: entry-point-api
+  egress:
+    - toEntities:
+        - kube-apiserver
+      toPorts:
+        - ports:
+            - port: "6443"
+              protocol: TCP

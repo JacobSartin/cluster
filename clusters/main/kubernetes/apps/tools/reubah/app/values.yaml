@@ -1,0 +1,108 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  main:
+    forceRename: reubah
+
+    pod:
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+        supplementalGroups:
+          - 568
+
+    containers:
+      main:
+        image:
+          repository: ghcr.io/dendianugerah/reubah
+          tag: main@sha256:2db201bb197110681012b9721a6b92a502f3fc46f79e3f1d5cad1b6367dfcda1
+
+        env:
+          TZ: ${TZ}
+          PORT: "8081"
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 8081
+              failureThreshold: 30
+              periodSeconds: 5
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 8081
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 8081
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: "1"
+            memory: 512Mi
+
+service:
+  main:
+    forceRename: reubah
+    controller: main
+    ports:
+      main:
+        port: 8081
+
+route:
+  main:
+    kind: HTTPRoute
+    labels:
+      gateway-role: internal
+    annotations:
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/name: "Reubah"
+      gethomepage.dev/group: "Tools"
+      gethomepage.dev/icon: "mdi-file-image"
+      gethomepage.dev/href: "https://images.${BASE_DOMAIN}"
+      gethomepage.dev/weight: "30"
+    hostnames:
+      - images.${BASE_DOMAIN}
+    parentRefs:
+      - name: internal
+        namespace: traefik-internal
+        sectionName: websecure
+    rules:
+      - backendRefs:
+          - identifier: main
+            port: 8081
+
+persistence:
+  app:
+    type: emptyDir
+    globalMounts:
+      - path: /app/tmp
+
+  tmp:
+    type: emptyDir

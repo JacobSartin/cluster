@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: minecraft-java-rcon-credentials
+    namespace: minecraft
+type: Opaque
+stringData:
+    password: ENC[AES256_GCM,data:HIoqSRxWFinktiTUBOZ1UClOfzg=,iv:wcnmnJXB86Jwo7wJN2BDmuuoHehIeoW1roVSB4U8jig=,tag:YCytw+cvXd/QrT4t2yg04Q==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHdHhGMDFzZXUzNTNsSGZa
+            UDBWV2dMdjluSHY2cHB5U05abERwc09aaGdFCmpJc1hXZkliKzdDSndabFpZYVNw
+            M0FybjNKczBhUkNMSjlQMUMyNHYrZWMKLS0tIGR0ZGp1SzJzOE8rdFhOem9WMWVY
+            cTRkSURSY3BiVkVwcldCNUxIT1VVRGMKGnY7g7JblhsQQ/MpifqBL2Jqm9EfaYGS
+            wnOTNZmnjSYRP1MsMiCF1Ui6SzI6XYYsgD6peeGtYzBeD5KBEaEu5Q==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1tpc0yytufplgg0gucz7ze52vhx0c0j6lvzctmy0kfg4fhyy444gqedj494
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBQVmlLdzZSd3lEdnI2TDRL
+            RkV2b1oxdkNKbzVIOGxzblBuTFFzNmk4d1Y4CmQ1TnhsWHJYOVQraDgxL1FWbloy
+            YlUzcDUzNVZyeUZoLzdmcDZld09IT3cKLS0tIHNyZ2EzN1dSYktuS2pyeFRhY1FF
+            eFJ6SDVYRi9na0VaZ0JsTEpURU9KSmsKB8AZmn8i3jZgRA04WlV5u/SyA1NhUZdO
+            M5zSw3VivGUYezNchh7tBHf3C/TNO2pwuSBwJTr+uYM+4LOnpB/cNQ==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1h8c7nenuf7rn6qjmackxrlt3nvjfyk77mw7ujnrsnnspkcle8s7qjsamhs
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-10-14T23:25:52Z"
+    mac: ENC[AES256_GCM,data:q3HC7PqqKGnupDAOtKtI0DQGoEVsLRsovx8/kIsgh1KI+GAVvw6dHigIprtXa/v5fioSw4udCZgAP8US7opU0AwkvDOm9NnltEPwTDY8RbbTTKACJVp7pDHRCRxNILHiUju8Kmh6eBSc7kcUbaSJ/V3YzcKq2fKqu3YPKlovlLw=,iv:3E47p9/d/nM1IjNJXOfbjxNrXytqnegQGdkRR+rnHXQ=,tag:Sp8r+mHWlJDeErcgL7iFAw==,type:str]
+    mac_only_encrypted: true
+    version: 3.13.3

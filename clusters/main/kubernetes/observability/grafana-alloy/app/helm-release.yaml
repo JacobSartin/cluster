@@ -1,0 +1,63 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: grafana-alloy
+  namespace: grafana-alloy
+spec:
+  interval: 15m
+  chartRef:
+    kind: OCIRepository
+    name: alloy
+    namespace: flux-system
+  timeout: 20m
+  driftDetection:
+    mode: warn
+  values:
+    alloy:
+      resources:
+        requests:
+          cpu: 15m
+          memory: 384Mi
+      configMap:
+        create: false
+        name: alloy-config
+        key: config.alloy
+      storagePath: /var/lib/alloy
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+        seccompProfile:
+          type: RuntimeDefault
+      mounts:
+        extra:
+          - name: storage
+            mountPath: /var/lib/alloy
+
+    # Only what config.alloy uses. The chart renders invalid YAML if either list is empty.
+    rbac:
+      rules:
+        - apiGroups: [""]
+          resources: [pods, pods/log]
+          verbs: [get, list, watch]
+      clusterRules:
+        - apiGroups: [""]
+          resources: [namespaces]
+          verbs: [get, list, watch]
+
+    controller:
+      podAnnotations:
+        reloader.stakater.com/auto: "true"
+      volumes:
+        extra:
+          - name: storage
+            hostPath:
+              path: /var/lib/alloy
+              type: DirectoryOrCreate
+
+    serviceMonitor:
+      enabled: true
+      interval: 30s

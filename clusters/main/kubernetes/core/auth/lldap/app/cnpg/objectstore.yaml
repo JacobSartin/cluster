@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/barmancloud.cnpg.io/objectstore_v1.json
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: lldap-rustfs
+  namespace: lldap
+spec:
+  configuration:
+    destinationPath: s3://${S3BUCKET}-lldap/lldap/cnpg
+    s3Credentials:
+      accessKeyId:
+        name: lldap-postgres-rustfs
+      secretAccessKey:
+        name: lldap-postgres-rustfs

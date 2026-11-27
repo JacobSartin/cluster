@@ -1,0 +1,133 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  main:
+    forceRename: bytestash
+    strategy: Recreate
+    pod:
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: Always
+        supplementalGroups:
+          - 568
+    containers:
+      main:
+        image:
+          repository: ghcr.io/jordan-dalby/bytestash
+          tag: 1.6.2@sha256:86d5726ef9a417775cc05120eed04c36915cbc41aea83c5799fc6b8d3ad77db5
+
+        env:
+          TZ: ${TZ}
+          DISABLE_ACCOUNTS: "true"
+          ALLOW_NEW_ACCOUNTS: "false"
+          DEBUG: "false"
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                port: 5000
+                path: /api/auth/config
+                scheme: HTTP
+              initialDelaySeconds: 10
+              failureThreshold: 60
+              successThreshold: 1
+              timeoutSeconds: 3
+              periodSeconds: 5
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                port: 5000
+                path: /api/auth/config
+                scheme: HTTP
+              initialDelaySeconds: 10
+              failureThreshold: 4
+              successThreshold: 2
+              timeoutSeconds: 5
+              periodSeconds: 12
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                port: 5000
+                path: /api/auth/config
+                scheme: HTTP
+              initialDelaySeconds: 12
+              failureThreshold: 5
+              successThreshold: 1
+              timeoutSeconds: 5
+              periodSeconds: 15
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 75m
+            memory: 200Mi
+          limits:
+            cpu: 1500m
+            memory: 2400Mi
+
+service:
+  main:
+    forceRename: bytestash
+    controller: main
+    ports:
+      main:
+        port: 5039
+        targetPort: 5000
+
+route:
+  main:
+    kind: HTTPRoute
+    labels:
+      gateway-role: internal
+    annotations:
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/name: "ByteStash"
+      gethomepage.dev/group: "Tools"
+      gethomepage.dev/icon: "bytestash.png"
+      gethomepage.dev/href: "https://code.${BASE_DOMAIN}"
+      gethomepage.dev/weight: "40"
+    hostnames:
+      - code.${BASE_DOMAIN}
+    parentRefs:
+      - name: internal
+        namespace: traefik-internal
+        sectionName: websecure
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        backendRefs:
+          - identifier: main
+            port: 5039
+
+persistence:
+  data:
+    existingClaim: bytestash-data
+    globalMounts:
+      - path: /data/snippets
+
+  tmp:
+    type: emptyDir
+    globalMounts:
+      - path: /tmp

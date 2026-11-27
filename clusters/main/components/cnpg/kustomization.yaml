@@ -1,0 +1,73 @@
+---
+# Requires one Cluster and one ObjectStore per Kustomization.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - rustfs-credentials.yaml
+  - scheduled-backup.yaml
+patches:
+  - target:
+      group: postgresql.cnpg.io
+      version: v1
+      kind: Cluster
+    path: cluster.yaml
+  - target:
+      group: barmancloud.cnpg.io
+      version: v1
+      kind: ObjectStore
+    path: objectstore.yaml
+# Rename placeholders after all selectors have used them.
+replacements:
+  - source:
+      group: postgresql.cnpg.io
+      kind: Cluster
+      fieldPath: metadata.namespace
+    targets:
+      - select:
+          kind: ScheduledBackup
+          name: postgres-daily
+        fieldPaths:
+          - metadata.namespace
+        options:
+          create: true
+      - select:
+          kind: ExternalSecret
+          name: postgres-rustfs
+        fieldPaths:
+          - metadata.namespace
+        options:
+          create: true
+  - source:
+      kind: ObjectStore
+      fieldPath: spec.configuration.s3Credentials.accessKeyId.name
+    targets:
+      - select:
+          kind: ExternalSecret
+          name: postgres-rustfs
+        fieldPaths:
+          - spec.target.name
+          - metadata.name
+  - source:
+      group: postgresql.cnpg.io
+      kind: Cluster
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: ScheduledBackup
+          name: postgres-daily
+        fieldPaths:
+          - spec.cluster.name
+  # A new archive gets a new ScheduledBackup, whose immediate backup is its first base backup.
+  - source:
+      group: postgresql.cnpg.io
+      kind: Cluster
+      fieldPath: spec.plugins.[name=barman-cloud.cloudnative-pg.io].parameters.serverName
+    targets:
+      - select:
+          kind: ScheduledBackup
+          name: postgres-daily
+        fieldPaths:
+          - metadata.name
+        options:
+          delimiter: "-"
+          index: 0

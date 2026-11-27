@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - helm-release.yaml
+  - namespace.yaml
+  - certificate.yaml
+
+configMapGenerator:
+  - name: static-web-server-config
+    namespace: static-web-server
+    files:
+      - sws.toml
+    options:
+      disableNameSuffixHash: true
+  - name: static-web-server-values
+    namespace: static-web-server
+    files:
+      - values.yaml
+    options:
+      disableNameSuffixHash: true
+      labels:
+        reconcile.fluxcd.io/watch: Enabled

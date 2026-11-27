@@ -1,0 +1,35 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - alloy.yaml
+  - app-template.yaml
+  - capsule.yaml
+  - cert-manager.yaml
+  - cilium.yaml
+  - cloudnative-pg.yaml
+  - descheduler.yaml
+  - external-dns.yaml
+  - external-secrets.yaml
+  - flux-instance.yaml
+  - flux-operator.yaml
+  - gha-runner-scale-set.yaml
+  - gha-runner-scale-set-controller.yaml
+  - grafana-operator.yaml
+  - headlamp.yaml
+  - intel-device-plugins-gpu.yaml
+  - intel-device-plugins-operator.yaml
+  - kube-prometheus-stack.yaml
+  - loki.yaml
+  - longhorn.yaml
+  - mend-renovate-ce.yaml
+  - metallb.yaml
+  - metrics-server.yaml
+  - node-feature-discovery.yaml
+  - plugin-barman-cloud.yaml
+  - prometheus-operator-crds.yaml
+  - reloader.yaml
+  - spegel.yaml
+  - traefik.yaml
+  - tuppr.yaml

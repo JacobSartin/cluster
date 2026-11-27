@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - helm-release.yaml
+  - pod-disruption-budget.yaml
+  - webhook-pvc-match-policy.yaml
+  - storage-class-single-replica.yaml
+  - volumeSnapshotClass.yaml
+  - httproute.yaml
+  - network-policy.yaml
+  - prometheus-rule.yaml
+components:
+  - ../../../../components/traefik/authelia

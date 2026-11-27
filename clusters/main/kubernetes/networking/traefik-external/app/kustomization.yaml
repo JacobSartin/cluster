@@ -1,0 +1,20 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - helm-release.yaml
+  - middleware.yaml
+  - network-policy.yaml
+  - tunnel-certificate.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    reconcile.fluxcd.io/watch: Enabled
+
+configMapGenerator:
+  - name: traefik-values
+    namespace: traefik-external
+    files:
+      - values.yaml

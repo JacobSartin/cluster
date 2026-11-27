@@ -1,0 +1,16 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: discordgsm
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: volsync
+    - name: external-secrets-stores
+    - name: longhorn
+  interval: 10m
+  path: clusters/main/kubernetes/apps/games/discordgsm/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster

@@ -1,0 +1,70 @@
+# renovate-schema: datasource=docker depName=quay.io/cilium/charts/cilium registryUrl=https://quay.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/cilium/cilium/v1.20.5/install/kubernetes/cilium/values.schema.json
+---
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  metrics:
+    enabled:
+      - dns
+      - drop
+      - tcp
+      - flow
+      - icmp
+    serviceMonitor:
+      enabled: true
+cluster:
+  name: main
+  id: 1
+routingMode: native
+autoDirectNodeRoutes: true
+ipv4NativeRoutingCIDR: ${PODNET}
+bpf:
+  masquerade: true
+securityContext:
+  capabilities:
+    ciliumAgent:
+      - CHOWN
+      - KILL
+      - NET_ADMIN
+      - NET_RAW
+      - IPC_LOCK
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    cleanCiliumState:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+cgroup:
+  autoMount:
+    enabled: false
+  hostRoot: /sys/fs/cgroup
+endpointRoutes:
+  enabled: true
+ipam:
+  mode: kubernetes
+k8sServiceHost: 127.0.0.1
+k8sServicePort: 7445
+kubeProxyReplacement: true
+kubeProxyReplacementHealthzBindAddr: 0.0.0.0:10256
+localRedirectPolicies:
+  enabled: true
+operator:
+  podDisruptionBudget:
+    enabled: true
+  rollOutPods: true
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+rollOutCiliumPods: true
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    trustCRDsExist: true

@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: "Pull Request: Validate"
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: validate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  validate:
+    uses: JacobSartin/homelab-ci/.github/workflows/validate.yaml@main
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    with:
+      assignee: JacobSartin
+      api-versions: monitoring.coreos.com/v1
+      allowed-skips: |-
+        private-system/private-cluster
+        shared/shared-cluster
+        flux-system/infrastructure
+        flux-system/tuppr-plans
+      supply: |-
+        .github/flate-supply.yaml
+      substitutions: |-
+        BASE_DOMAIN=example.invalid
+      kubeconform-skip: |-
+        capsule.clastix.io/v1beta2/Tenant

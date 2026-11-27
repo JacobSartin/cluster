@@ -1,0 +1,45 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: traefik-internal
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: clusterissuer
+    - name: gateway-api-crds
+    - name: prometheus-operator-crds
+    - name: metallb-config
+  interval: 10m
+  path: clusters/main/kubernetes/networking/traefik-internal/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster
+  healthChecks:
+    - apiVersion: apiextensions.k8s.io/v1
+      kind: CustomResourceDefinition
+      name: middlewares.traefik.io
+    - apiVersion: apiextensions.k8s.io/v1
+      kind: CustomResourceDefinition
+      name: serverstransports.traefik.io
+    - apiVersion: apiextensions.k8s.io/v1
+      kind: CustomResourceDefinition
+      name: traefikservices.traefik.io
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: traefik-dashboards
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: grafana-operator
+    - name: traefik-external
+    - name: traefik-internal
+  interval: 10m
+  path: clusters/main/kubernetes/networking/traefik-internal/dashboards
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster

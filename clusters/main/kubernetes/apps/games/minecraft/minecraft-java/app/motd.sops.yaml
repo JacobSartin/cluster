@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: minecraft-java-motd
+    namespace: minecraft
+type: Opaque
+stringData:
+    motd: ENC[AES256_GCM,data:Q1wmcaWtGyV75qmoKOM93cz3QncZhrK2V1YgmD+SzpXSQJiI4I3CiEY=,iv:wDpRa44cEus8iCEXGdSMy5ZAcUf4XdFbc0P4ARdc0hs=,tag:tp2ZjIlZNZ768kXCpmm93A==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyZWtoOCtvcFZXbTFKK2Fo
+            MUVCWFRxT2hrZVNQOWVYWVE0M29IYjNtQjNjCk02K01rS1NHVlVFMTFhSUp3eFYv
+            UDE2blRaWjlpS2pSdmZjQ0tZSVArZ0UKLS0tIEV2VzJPSDVtZzBHQVVZRlduZVFt
+            djA1aDMxQmJvUUFSVGl4N01PQVR1UmMKJtLY44EmHAWgo3pecLIGvNdwv29lCr2J
+            QmOdy7iEAeQv2UvOcin9FQy3cHS5tFnHBh/T/e/v+bOS7go3iQ1oaA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1tpc0yytufplgg0gucz7ze52vhx0c0j6lvzctmy0kfg4fhyy444gqedj494
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4YjZDM2l3ZS9FRVI3THl1
+            VzJDOXRRMFZSald4WEFIOFRDVE9ReFFkL21ZCkMybnpXdU1VcHJmMWVMbGJUYnlX
+            d0tWckJTRFNBS2R5QXJLUGo0RVpUeWcKLS0tIFR4VU9tdzBOVy9HczlKUGJEbXBx
+            NkNLNk9UaGg5Z0N0c01WT3VBcjVsWncKRrRJ3W1GVfoess4jFEjrrapVBZvVkmpd
+            FJzwIipkCy2QEMVfk2Dkp3GAvb0APkjPpdptR5pBtjVFl5iqaqT3FA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1h8c7nenuf7rn6qjmackxrlt3nvjfyk77mw7ujnrsnnspkcle8s7qjsamhs
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-10-13T22:29:20Z"
+    mac: ENC[AES256_GCM,data:1eHJ1cE5MCNKKKiOlRcoYw5jp6kxhBaoHJ4O+S3496wtbUB97YbmMUk78IvJpvn3tiLPQD1poir5KnUY4MXLgXHPlokez1h5Kud70QFdrpxy5GzcgfQb0GBrbM5elBwojNKuepS5hcbTGsSokiVBqP9W9E0tIdzW/vhhPJq4YQs=,iv:MOsKwYDDEBIh+/cwp3yAhLCPPwgYkiCxlQE6odmFVL8=,tag:S5Ymne0QNkloHOauad7VyA==,type:str]
+    mac_only_encrypted: true
+    version: 3.13.3

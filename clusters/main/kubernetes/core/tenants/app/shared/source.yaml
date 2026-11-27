@@ -1,0 +1,17 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/gitrepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: shared-cluster
+  namespace: shared
+spec:
+  interval: 30m
+  url: ssh://git@github.com/JacobSartin/shared-cluster.git
+  ref:
+    branch: main
+  secretRef:
+    name: shared-cluster-deploy-key
+  ignore: |
+    /*
+    !/apps

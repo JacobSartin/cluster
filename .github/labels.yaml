@@ -1,0 +1,46 @@
+# Labels absent here are deleted by the sync workflow.
+- name: type/major
+  color: "f6412d"
+  description: Major version update
+- name: type/minor
+  color: "ff9800"
+  description: Minor version update
+- name: type/patch
+  color: "ffec19"
+  description: Patch version update
+- name: type/digest
+  color: "ffec19"
+  description: Digest update
+- name: type/pin
+  color: "ededed"
+  description: Version or digest pin
+- name: renovate/container
+  color: "027fa0"
+  description: Container image or Helm chart update
+- name: renovate/github-release
+  color: "027fa0"
+  description: GitHub release or tag update
+- name: renovate/github-action
+  color: "027fa0"
+  description: GitHub Actions update
+- name: automerge
+  color: "0e8a16"
+  description: Renovate merges this when checks pass
+- name: manual
+  color: "d93f0b"
+  description: Requires manual review
+- name: system-upgrade
+  color: "5319e7"
+  description: Talos or Kubernetes upgrade
+- name: bug
+  color: "d73a4a"
+  description: Something isn't working
+- name: documentation
+  color: "0075ca"
+  description: Improvements or additions to documentation
+- name: enhancement
+  color: "a2eeef"
+  description: New feature or request
+- name: question
+  color: "d876e3"
+  description: Further information is requested

@@ -1,0 +1,36 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: flux
+  namespace: flux-system
+spec:
+  groups:
+    - name: flux
+      rules:
+        - alert: FluxInstanceNotReady
+          expr: flux_instance_info{ready!="True"} == 1
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'FluxInstance {{ $labels.name }} is not ready'
+            description: '{{ $labels.reason }}: flux-operator has not reconciled the Flux controllers for 10 minutes, so nothing deploys.'
+
+        - alert: FluxResourceNotReady
+          expr: flux_resource_info{ready=~"False|Unknown", suspended="False"} == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Flux {{ $labels.kind }} {{ $labels.exported_namespace }}/{{ $labels.name }} is not ready'
+            description: '{{ $labels.reason }}: the object has not been Ready for 15 minutes. Read its status conditions with flux get or kubectl describe.'
+
+        - alert: FluxOperatorMetricsMissing
+          expr: absent(flux_instance_info)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: flux-operator metrics are missing
+            description: Prometheus has not scraped flux_instance_info for 15 minutes, so a broken Flux object would go unnoticed.

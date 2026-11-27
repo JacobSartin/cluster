@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - helm-release.yaml
+  - admin-credentials.yaml
+  - credentials.sops.yaml
+  - network-policy.yaml
+  - rbac.yaml
+  - session-secrets.yaml
+  - private-key.sops.yaml
+  - cnpg
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: lldap-service-accounts-script
+    namespace: lldap
+    files:
+      - service-accounts.sh
+    options:
+      annotations:
+        # Disable Flux substitution for shell expansions.
+        kustomize.toolkit.fluxcd.io/substitute: disabled
+  - name: lldap-values
+    namespace: lldap
+    files:
+      - values.yaml
+    options:
+      labels:
+        reconcile.fluxcd.io/watch: Enabled

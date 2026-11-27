@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: capsule
+  namespace: capsule-system
+spec:
+  interval: 15m
+  chartRef:
+    kind: OCIRepository
+    name: capsule
+    namespace: flux-system
+  timeout: 20m
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    replicaCount: 2
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: capsule
+                app.kubernetes.io/name: capsule
+            topologyKey: kubernetes.io/hostname
+    manager:
+      deploymentStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 0
+          maxUnavailable: 1
+      resources:
+        requests:
+          cpu: 10m
+          memory: 128Mi
+      options:
+        users:
+          - kind: Group
+            name: projectcapsule.dev
+          - kind: Group
+            name: system:serviceaccounts:private-system
+        administrators:
+          - kind: Group
+            name: system:masters

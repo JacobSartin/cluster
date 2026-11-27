@@ -1,0 +1,228 @@
+# yaml-language-server: $schema=https://www.authelia.com/schemas/latest/json-schema/configuration.json
+# Avoid template delimiters in comments; this file is rendered before YAML parsing.
+theme: dark
+
+server:
+  endpoints:
+    authz:
+      forward-auth:
+        implementation: ForwardAuth
+        authn_strategies:
+          - name: HeaderProxyAuthorization
+            schemes:
+              - basic
+            scheme_basic_cache_lifespan: 5m
+          - name: CookieSession
+
+session:
+  secret: '{{ secret "/config/session/AUTHELIA_SESSION_SECRET" }}'
+  cookies:
+    - domain: ${BASE_DOMAIN}
+      authelia_url: https://auth.${BASE_DOMAIN}
+  redis:
+    host: authelia-valkey-0.authelia-valkey.authelia.svc.cluster.local
+    port: 26379
+    password: '{{ secret "/config/valkey/VALKEY_PASSWORD" }}'
+    high_availability:
+      sentinel_name: authelia
+      sentinel_password: '{{ secret "/config/valkey/VALKEY_PASSWORD" }}'
+      nodes:
+        - host: authelia-valkey-1.authelia-valkey.authelia.svc.cluster.local
+          port: 26379
+        - host: authelia-valkey-2.authelia-valkey.authelia.svc.cluster.local
+          port: 26379
+
+storage:
+  encryption_key: '{{ secret "/config/storage-key/AUTHELIA_STORAGE_ENCRYPTION_KEY" }}'
+  postgres:
+    address: tcp://authelia-postgres-rw.authelia.svc.cluster.local:5432
+    database: authelia
+    username: authelia
+    password: '{{ secret "/config/cnpg/password" }}'
+
+authentication_backend:
+  refresh_interval: 1m
+
+  password_reset:
+    disable: false
+  password_change:
+    disable: false
+
+  ldap:
+    implementation: lldap
+    address: ldap://lldap-ldap.lldap.svc.cluster.local:3890
+    base_dn: ${LDAP_BASE_DN}
+    user: uid=svc-authelia,ou=people,${LDAP_BASE_DN}
+    password: '{{ secret "/config/ldap/password" }}'
+
+notifier:
+  smtp:
+    address: submission://${SMTP_HOST}:587
+    username: ${SMTP_USER}
+    password: '{{ secret "/config/env/AUTHELIA_NOTIFIER_SMTP_PASSWORD" }}'
+    # yaml-language-server-disable String is not an e-mail address
+    sender: Authelia <no-reply@${BASE_DOMAIN}>
+    tls:
+      server_name: ${SMTP_HOST}
+
+password_policy:
+  standard:
+    enabled: true
+    min_length: 10
+    max_length: 0
+    require_uppercase: true
+    require_lowercase: true
+    require_number: true
+    require_special: true
+
+access_control:
+  default_policy: deny
+  rules:
+    - domain: "*.${BASE_DOMAIN}"
+      subject: user:svc-gatus
+      networks:
+        - ${PODNET}
+      methods:
+        - GET
+        - HEAD
+      resources:
+        - "^/([?].*)?$"
+        - "^/(api/|misc/)?(health|healthz|livez|readyz|ping|status)/?([?].*)?$"
+        - "^/login/?([?].*)?$"
+      policy: one_factor
+    - domain:
+        - "*.${BASE_DOMAIN}"
+        - ${BASE_DOMAIN}
+      policy: two_factor
+      subject:
+        - group:lldap_admin
+
+totp:
+  issuer: ${BASE_DOMAIN}
+
+webauthn:
+  display_name: ${BASE_DOMAIN}
+
+identity_validation:
+  reset_password:
+    jwt_secret: '{{ secret "/config/session/AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET" }}'
+
+identity_providers:
+  oidc:
+    hmac_secret: '{{ secret "/config/session/AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET" }}'
+    jwks:
+      # yaml-language-server-disable String does not match
+      - key: |
+          {{ secret "/config/secret/jwks_rsa_key.pem" | mindent 10 "|" | msquote }}
+    authorization_policies:
+      apps:
+        default_policy: "deny"
+        rules:
+          - policy: two_factor
+            subject: "group:lldap_admin"
+          - policy: "one_factor"
+            subject: "group:apps"
+      admin:
+        default_policy: deny
+        rules:
+          - policy: two_factor
+            subject: "group:lldap_admin"
+
+    # These clients require claims in the ID token.
+    claims_policies:
+      grafana:
+        id_token: ["email", "name", "groups", "preferred_username"]
+      rustfs:
+        id_token: ["email", "name", "groups", "preferred_username"]
+    clients:
+      - client_id: "${HOMEPAGE_OIDC_CLIENT_ID}"
+        client_name: "Homepage"
+        # yaml-language-server-disable String does not match
+        client_secret: '{{ secret "/config/oidc-clients/clients_homepage_secret" }}'
+        public: false
+        authorization_policy: apps
+        require_pkce: false
+        pkce_challenge_method: ""
+        redirect_uris:
+          - https://home.${BASE_DOMAIN}/api/auth/callback/homepage-oidc
+        scopes:
+          - openid
+          - profile
+          - groups
+          - email
+        response_types:
+          - "code"
+        grant_types:
+          - "authorization_code"
+
+      - client_id: "${GRAFANA_OIDC_CLIENT_ID}"
+        client_name: "Grafana"
+        # yaml-language-server-disable String does not match
+        client_secret: '{{ secret "/config/oidc-clients/clients_grafana_secret" }}'
+        public: false
+        authorization_policy: "admin"
+        claims_policy: grafana
+        require_pkce: true
+        pkce_challenge_method: "S256"
+        redirect_uris:
+          - "https://grafana.${BASE_DOMAIN}/login/generic_oauth"
+        scopes:
+          - "openid"
+          - "profile"
+          - "groups"
+          - "email"
+        response_types:
+          - "code"
+        grant_types:
+          - "authorization_code"
+        access_token_signed_response_alg: "none"
+        userinfo_signed_response_alg: "none"
+        token_endpoint_auth_method: "client_secret_basic"
+
+      - client_id: "${PRIVATE_OIDC_CLIENT_ID}"
+        client_name: "${PRIVATE_OIDC_CLIENT_NAME}"
+        # yaml-language-server-disable String does not match
+        client_secret: '{{ secret "/config/oidc-clients/clients_private_secret" }}'
+        public: false
+        authorization_policy: apps
+        require_pkce: false
+        pkce_challenge_method: ""
+        redirect_uris:
+          - "${PRIVATE_OIDC_REDIRECT_URI}"
+        scopes:
+          - "openid"
+          - "profile"
+          - "groups"
+          - "email"
+        response_types:
+          - "code"
+        grant_types:
+          - "authorization_code"
+        access_token_signed_response_alg: "none"
+        userinfo_signed_response_alg: "none"
+        token_endpoint_auth_method: "client_secret_post"
+
+      - client_id: "${RUSTFS_OIDC_CLIENT_ID}"
+        client_name: "RustFS"
+        # yaml-language-server-disable String does not match
+        client_secret: |
+          {{ secret "/config/secret/clients_rustfs_secret" }}
+        public: false
+        authorization_policy: admin
+        claims_policy: rustfs
+        require_pkce: true
+        pkce_challenge_method: "S256"
+        redirect_uris:
+          - "https://rustfs.${BASE_DOMAIN}/rustfs/admin/v3/oidc/callback/default"
+        scopes:
+          - "openid"
+          - "profile"
+          - "groups"
+          - "email"
+        response_types:
+          - "code"
+        grant_types:
+          - "authorization_code"
+        access_token_signed_response_alg: "none"
+        userinfo_signed_response_alg: "none"
+        token_endpoint_auth_method: "client_secret_post"

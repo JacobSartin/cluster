@@ -1,0 +1,137 @@
+#!/usr/bin/env sh
+set -eu
+# Git for Windows treats a hook killed by SIGPIPE as success.
+trap '' PIPE
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+fixed=
+
+# Keys under data/stringData whose value is not ENC[...].
+plain_keys() {
+  awk '
+    { sub(/\r$/, "") }
+    /^[^ #-]/ { top = $0; sub(/:.*/, "", top) }
+    (top == "data" || top == "stringData") && /^ +[^ #][^:]*: *[^ ]/ &&
+      !/ENC\[AES256_GCM,/ && !/: *(""|\047\047) *$/ {
+      key = $0; sub(/^ +/, "", key); sub(/:.*/, "", key); printf "%s%s", sep, key; sep = ", "
+    }
+  ' "$1"
+}
+
+secrets=
+while IFS= read -r file; do
+  case ${file##*/} in
+    '' | .sops.yaml | .sops.yml) ;;
+    *.sops*) secrets="$secrets$file
+" ;;
+  esac
+done <<EOF
+$(git diff --cached --name-only --diff-filter=ACMR)
+EOF
+if [ -n "$secrets" ]; then
+  if ! command -v sops >/dev/null 2>&1; then
+    echo "pre-commit: install sops to check staged secrets." >&2 || :
+    exit 1
+  fi
+  printf '%s' "$secrets" | git checkout-index --prefix="$tmp/sops/" --stdin
+  plain=
+  handadded=
+  while IFS= read -r file; do
+    [ -n "$file" ] || continue
+    case $(sops filestatus "$tmp/sops/$file") in
+      *'"encrypted":true'*)
+        # filestatus only looks for sops metadata, so a value added by hand passes it.
+        keys=$(plain_keys "$tmp/sops/$file")
+        [ -z "$keys" ] || handadded="$handadded
+  $file: $keys"
+        continue
+        ;;
+    esac
+    # Preserve unstaged edits in partially staged files.
+    if ! git diff --quiet --no-textconv -- "$file"; then
+      plain="$plain
+  $file"
+      continue
+    fi
+    # Select the creation rule using the original path.
+    sops encrypt --filename-override "$file" "$tmp/sops/$file" >"$tmp/encrypted"
+    cp "$tmp/encrypted" "$file"
+    git add -- "$file"
+    echo "pre-commit: encrypted $file" >&2 || :
+    fixed=1
+  done <<EOF
+$secrets
+EOF
+  if [ -n "$plain" ]; then
+    echo "pre-commit: these partially staged files are not encrypted:$plain" >&2 || :
+    echo "Stage them fully, or run 'sops encrypt --in-place' and restage." >&2 || :
+    exit 1
+  fi
+  if [ -n "$handadded" ]; then
+    echo "pre-commit: these encrypted files hold plaintext values:$handadded" >&2 || :
+    echo "Remove them and set each with 'sops set' or 'sops edit', then restage." >&2 || :
+    exit 1
+  fi
+fi
+
+# Git does not recheck for an empty commit after a hook restages files.
+finish() {
+  leaks=$(command -v gitleaks 2>/dev/null || mise which gitleaks 2>/dev/null) || leaks=
+  if [ -z "$leaks" ]; then
+    echo "pre-commit: run 'mise install' to install gitleaks." >&2 || :
+    exit 1
+  fi
+  # Scan SOPS ciphertext, not the sopsdiffer decrypted view.
+  n=${GIT_CONFIG_COUNT:-0}
+  if ! env GIT_CONFIG_COUNT=$((n + 1)) "GIT_CONFIG_KEY_$n=diff.sopsdiffer.textconv" "GIT_CONFIG_VALUE_$n=cat" \
+    "$leaks" git --staged --redact --no-banner --log-level warn; then
+    echo "pre-commit: gitleaks found possible secrets in the staged changes." >&2 || :
+    echo "Move them into SOPS, or allowlist false positives in .gitleaks.toml." >&2 || :
+    exit 1
+  fi
+  if [ -n "$fixed" ] && git diff --cached --quiet HEAD --; then
+    echo "pre-commit: nothing left to commit after the hook's changes." >&2 || :
+    exit 1
+  fi
+}
+
+files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.yaml' '*.yml')
+if [ -z "$files" ]; then
+  finish
+  exit 0
+fi
+
+fmt=$(command -v homelab-fmt 2>/dev/null || mise which homelab-fmt 2>/dev/null) || fmt=
+if [ -z "$fmt" ]; then
+  echo "pre-commit: run 'mise install' to install homelab-fmt." >&2 || :
+  exit 1
+fi
+
+set --
+while IFS= read -r file; do set -- "$@" "$file"; done <<EOF
+$files
+EOF
+
+printf '%s\n' "$@" | git checkout-index --prefix="$tmp/yaml/" --stdin
+(cd "$tmp/yaml" && "$fmt" "$@" >/dev/null)
+
+partial=
+for file in "$@"; do
+  [ "$(git hash-object --path="$file" "$tmp/yaml/$file")" = "$(git rev-parse ":$file")" ] && continue
+  if git diff --quiet -- "$file"; then
+    cp "$tmp/yaml/$file" "$file"
+    git add -- "$file"
+    fixed=1
+  else
+    partial="$partial
+  $file"
+  fi
+done
+if [ -n "$partial" ]; then
+  echo "pre-commit: these partially staged files need formatting:$partial" >&2 || :
+  echo "Stage them fully, or run 'homelab-fmt <file>' and restage." >&2 || :
+  exit 1
+fi
+
+finish

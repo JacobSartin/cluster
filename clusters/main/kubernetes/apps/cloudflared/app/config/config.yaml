@@ -1,0 +1,9 @@
+originRequest:
+  matchSNItoHost: true
+# Traefik's tunnel listener takes any public host on any connection.
+ingress:
+  - hostname: ${BASE_DOMAIN}
+    service: https://traefik-external-tunnel.traefik-external.svc.cluster.local
+  - hostname: "*.${BASE_DOMAIN}"
+    service: https://traefik-external-tunnel.traefik-external.svc.cluster.local
+  - service: http_status:404

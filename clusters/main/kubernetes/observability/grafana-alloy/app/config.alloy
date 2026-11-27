@@ -1,0 +1,199 @@
+loki.write "default" {
+        endpoint {
+                url = "http://grafana-loki-gateway.grafana-loki.svc.cluster.local:80/loki/api/v1/push"
+        }
+}
+discovery.kubernetes "pod" {
+        role = "pod"
+
+        selectors {
+                role  = "pod"
+                field = "spec.nodeName=" + sys.env("HOSTNAME")
+        }
+}
+
+discovery.relabel "pod_logs" {
+        targets = discovery.kubernetes.pod.targets
+
+        rule {
+                source_labels = ["__meta_kubernetes_namespace"]
+                action        = "replace"
+                target_label  = "namespace"
+        }
+
+        rule {
+                source_labels = ["__meta_kubernetes_pod_name"]
+                action        = "replace"
+                target_label  = "pod"
+        }
+
+        rule {
+                source_labels = ["__meta_kubernetes_pod_container_name"]
+                action        = "replace"
+                target_label  = "container"
+        }
+
+        rule {
+                source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+                action        = "replace"
+                target_label  = "app"
+        }
+
+        rule {
+                source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_container_name"]
+                action        = "replace"
+                target_label  = "job"
+                separator     = "/"
+                replacement   = "$1"
+        }
+
+        rule {
+                source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+                action        = "replace"
+                target_label  = "__path__"
+                separator     = "/"
+                replacement   = "/var/log/pods/*$1/*.log"
+        }
+
+        rule {
+                source_labels = ["__meta_kubernetes_pod_container_id"]
+                action        = "replace"
+                target_label  = "container_runtime"
+                regex         = "^(\\S+):\\/\\/.+$"
+                replacement   = "$1"
+        }
+
+        rule {
+                source_labels = ["__meta_kubernetes_pod_annotation_observability_jacobsartin_com_multiline_profile"]
+                action        = "replace"
+                target_label  = "multiline_profile"
+        }
+}
+
+loki.source.kubernetes "pod_logs" {
+        targets    = discovery.relabel.pod_logs.output
+        forward_to = [loki.process.pod_logs.receiver]
+}
+
+loki.process "pod_logs" {
+        stage.static_labels {
+                values = {
+                        cluster = "main",
+                }
+        }
+
+        stage.decolorize { }
+
+        stage.match {
+                selector = `{namespace="unifi-port-forward"} |~ "( ERROR |^E[0-9]{4} )"`
+
+                stage.metrics {
+                        metric.counter {
+                                name        = "unifi_port_forward_errors_total"
+                                description = "unifi-port-forward error log lines"
+                                match_all   = true
+                                action      = "inc"
+                                // Retain sparse series long enough for increase().
+                                max_idle_duration = "2h"
+                        }
+                }
+        }
+
+        stage.match {
+                selector = `{namespace="unifi-port-forward"} |= "Synced router and control plane state" |= "failed_operations=0"`
+
+                stage.metrics {
+                        metric.counter {
+                                name        = "unifi_port_forward_clean_syncs_total"
+                                description = "unifi-port-forward periodic drift checks without failed operations"
+                                match_all   = true
+                                action      = "inc"
+                                // Retain sparse series long enough for increase().
+                                max_idle_duration = "2h"
+                        }
+                }
+        }
+
+        stage.replace {
+                expression = `(?i)(?:[?&]|%3f|%26|\\u0026)(?:x-[a-z]+-token|api_?key|access_token|token)(?:=|%3d)((?:[^&%\s"'<>\\]|%(?:[013-9a-f][0-9a-f]|2[0-57-9a-f]))+)`
+                replace    = "REDACTED"
+        }
+
+        stage.match {
+                selector = `{multiline_profile="stacktrace"}`
+
+                stage.multiline {
+                        firstline     = `^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T|\[(?:Trace|Debug|Info|Warn|Error|Fatal|[Ee]ntrypoint)\]|\[[0-9]{2}:[0-9]{2}:[0-9]{2}\] \[(?:TRC|DBG|INF|WRN|ERR|FTL)\])`
+                        max_lines     = 256
+                        max_wait_time = "2s"
+                }
+        }
+
+        // Later matches take precedence when deriving severity.
+
+        stage.regex {
+                expression = `^(?P<klog_level>[IWEF])[0-9]{4} `
+        }
+
+        stage.regex {
+                expression = `"level"[ ]*:[ ]*(?P<pino_level>10|20|30|40|50|60)`
+        }
+
+        stage.regex {
+                expression = `HTTP/[0-9.]+"[ ]+(?P<http_status_class>[1-5])[0-9]{2}`
+        }
+
+        stage.regex {
+                expression = `[ ]+(?P<http_status_class>[1-5])[0-9]{2}[ ]+"[A-Z]+ .* HTTP/[0-9.]+`
+        }
+
+        stage.regex {
+                expression = `^[A-Z]+ [^ ]+ (?P<http_status_class>[1-5])[0-9]{2} `
+        }
+
+        stage.regex {
+                expression = `\[watchdog\.executeEndpoint\].*success=(?P<gatus_success>true|false);`
+        }
+
+        stage.template {
+                source   = "level"
+                template = `
+                        {{- if .gatus_success -}}
+                                {{- if eq .gatus_success "false" -}} warn
+                                {{- else -}} info
+                                {{- end -}}
+                        {{- else if .http_status_class -}}
+                                {{- if eq .http_status_class "5" -}} error
+                                {{- else if eq .http_status_class "4" -}} warn
+                                {{- else -}} info
+                                {{- end -}}
+                        {{- else if .pino_level -}}
+                                {{- if eq .pino_level "10" -}} trace
+                                {{- else if eq .pino_level "20" -}} debug
+                                {{- else if eq .pino_level "30" -}} info
+                                {{- else if eq .pino_level "40" -}} warn
+                                {{- else if eq .pino_level "50" -}} error
+                                {{- else -}} fatal
+                                {{- end -}}
+                        {{- else if .klog_level -}}
+                                {{- if eq .klog_level "I" -}} info
+                                {{- else if eq .klog_level "W" -}} warn
+                                {{- else if eq .klog_level "E" -}} error
+                                {{- else -}} fatal
+                                {{- end -}}
+                        {{- end -}}
+                `
+        }
+
+        stage.structured_metadata {
+                values = {
+                        level = "",
+                }
+        }
+
+        stage.label_drop {
+                values = ["multiline_profile"]
+        }
+
+        forward_to = [loki.write.default.receiver]
+}

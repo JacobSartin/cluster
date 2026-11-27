@@ -1,0 +1,20 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  packageRules: [
+    {
+      description: "Update Actions runner scale sets and their controller together",
+      matchManagers: ["flux"],
+      matchDatasources: ["docker"],
+      matchPackageNames: [
+        "ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set",
+        "ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller",
+      ],
+      groupName: "Actions runner controller and scale sets",
+      groupSlug: "actions-runner-controller-and-scale-sets",
+      separateMajorMinor: false,
+      separateMinorPatch: false,
+      separateMultipleMajor: false,
+      separateMultipleMinor: false,
+    },
+  ],
+}

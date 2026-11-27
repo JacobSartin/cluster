@@ -1,0 +1,17 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "github>JacobSartin/cluster//.github/renovate/base/defaults.json5",
+    "github>JacobSartin/cluster//.github/renovate/base/commit-messages.json5",
+    "github>JacobSartin/cluster//.github/renovate/base/labels.json5",
+    "github>JacobSartin/cluster//.github/renovate/base/automerge.json5",
+    "github>JacobSartin/cluster//.github/renovate/base/ci-inputs.json5",
+    "github>JacobSartin/cluster//.github/renovate/base/flux.json5",
+    "github>JacobSartin/cluster//.github/renovate/base/version-markers.json5",
+    "github>JacobSartin/cluster//.github/renovate/base/chart-schema.json5",
+    "github>JacobSartin/cluster//.github/renovate/base/chart-sources.json5",
+    "github>JacobSartin/cluster//.github/renovate/base/dashboard-urls.json5",
+    "github>JacobSartin/cluster//.github/renovate/base/docs-urls.json5",
+    "github>JacobSartin/cluster//.github/renovate/base/cloudnative-pg.json5",
+  ],
+}

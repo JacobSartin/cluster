@@ -1,0 +1,58 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  main:
+    forceRename: unifi-port-forward
+    replicas: 1
+    strategy: Recreate
+
+    serviceAccount:
+      name: unifi-port-forward
+
+    pod:
+      annotations:
+        # Update with crd.yaml; CRD discovery runs only at startup.
+        unifi-port-forward.fiskhe.st/crd-revision: "6187918"
+        secret.reloader.stakater.com/reload: unifi-port-forward
+      securityContext:
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+
+      automountServiceAccountToken: true
+
+    containers:
+      main:
+        image:
+          repository: ghcr.io/fiskhest/unifi-port-forward
+          tag: 2026-08-27-6187918@sha256:3b5ef315de9bc1fd9e1fb2ebc784d2d913b99b61a7ef1be66ecc671856b5aafe
+
+        env:
+          UNIFI_ROUTER_IP: ${GATEWAY}
+          UNIFI_API_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: unifi-port-forward
+                key: api-key
+          UNIFI_SYNC_INTERVAL: 15m
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+
+serviceAccount:
+  main:
+    forceRename: unifi-port-forward

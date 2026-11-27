@@ -1,0 +1,48 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: private-cluster
+  namespace: private-system
+spec:
+  dependsOn:
+    - name: tenants
+      namespace: flux-system
+    - name: gateway-api-crds
+      namespace: flux-system
+  interval: 10m
+  path: ./apps
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: private-cluster
+  wait: true
+  serviceAccountName: flux
+  decryption:
+    provider: sops
+    secretRef:
+      name: private-sops-age
+  postBuild:
+    substituteFrom:
+      - kind: Secret
+        name: cluster-settings
+  patches:
+    # The target selector replaces this placeholder name.
+    - patch: |-
+        apiVersion: kustomize.toolkit.fluxcd.io/v1
+        kind: Kustomization
+        metadata:
+          name: not-used
+        spec:
+          decryption:
+            provider: sops
+            secretRef:
+              name: private-sops-age
+          postBuild:
+            substituteFrom:
+              - kind: Secret
+                name: cluster-settings
+      target:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization

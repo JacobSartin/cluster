@@ -1,0 +1,54 @@
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: prometheus
+  namespace: grafana-operator
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  datasource:
+    type: prometheus
+    name: Prometheus
+    uid: prometheus
+    access: proxy
+    isDefault: true
+    url: http://prometheus-operated.kube-prometheus-stack.svc.cluster.local:9090
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: loki
+  namespace: grafana-operator
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  datasource:
+    type: loki
+    name: Loki
+    uid: loki
+    access: proxy
+    jsonData:
+      maxLines: 250
+    url: http://grafana-loki-gateway.grafana-loki.svc.cluster.local
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: alertmanager
+  namespace: grafana-operator
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  datasource:
+    type: alertmanager
+    name: Alertmanager
+    uid: alertmanager
+    access: proxy
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: false
+    url: http://kube-prometheus-stack-alertmanager.kube-prometheus-stack.svc.cluster.local:9093

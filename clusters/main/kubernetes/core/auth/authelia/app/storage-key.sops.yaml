@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: authelia-storage-key
+    namespace: authelia
+type: Opaque
+stringData:
+    AUTHELIA_STORAGE_ENCRYPTION_KEY: ENC[AES256_GCM,data:QRswmOZ4MTfyuR9uQpy4KpdxMQeQX7/hISnu9/5IU8+Ml96qeHx/ebk74bhQ07lPMByJm0xbgWJpH5Ydb6TGIg==,iv:0Dp2xZMzD62OEpASM+dxH1/tIUxWS/e/uqqByfi6THY=,tag:b8z6+xMZ0o4Ho7RQGjmuWQ==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBTcHJsTUVuRTZTajlKMWI3
+            OFVvK1p4c3VFb1lRdGluaWh0YW9naFg1dWlZCkpzdG92bVFIRHljRkJyaVNTMjNP
+            dS9sQWE2NERDTWxiN3NiUy9oKzRXUlEKLS0tIEpLNGtDa29FRFFrU2RoUjNpaUp1
+            R1VpdnBTNlI0VTZDVlhzY2RncGZOOTQKCSfrmfB125LY9ftTuGUEEgtBo7RTzI1x
+            bFnTCpZrKzpVcRESsuE7P6DRPMo4i6/uK4MjdWgXA3CWonNmcVg7uQ==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1tpc0yytufplgg0gucz7ze52vhx0c0j6lvzctmy0kfg4fhyy444gqedj494
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJbFdQSjhLZndZMXJ5cFg5
+            aDZoN3RtTjRKUElKdDIzUTFsU1JmQmVvV0FjCk9CYmV1ZXZza2hyNTVYc3Vmb096
+            RTl5R2N1dTRYRTNJRUNJK01LaXg2QlEKLS0tIE9zS091cXRoM1ZUWWQzeG5jak5Y
+            dnN0UWp5OVRuNnZEVmMxZWp3KzZLbE0KFZCzFGWldVt7AK9SxPMtGjNercVKGnEb
+            ft2glifzVsHYcIXmpTXyJsYLTA+JvkzLZgdoQqw+XU3+1izSW9NNWA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1h8c7nenuf7rn6qjmackxrlt3nvjfyk77mw7ujnrsnnspkcle8s7qjsamhs
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-10-14T15:16:09Z"
+    mac: ENC[AES256_GCM,data:+qVAinXZta4rAFbOqH3OdAu7XBZVNzQr5P4sKHJWTnAY/0YOEnMpaXpi2sXTJz5HUxp1d1OuWn2cEaZOYFLBQA2uKEHSg9dtIV/0THpfe4C2EZOWQ5sBycoO+KmhOGPxo/2+YGwu5eWIL4NKq56IUEed7u6bwH31omB1MBDjy+Q=,iv:m6sieRHSTfHryekbZSUMtIddmHXvuoZ1NSDZ7HFyF7k=,tag:owA45+dckX/J5fkmZrcvqw==,type:str]
+    mac_only_encrypted: true
+    version: 3.13.3

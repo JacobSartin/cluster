@@ -1,0 +1,251 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  main:
+    forceRename: lldap
+    annotations:
+      reloader.stakater.com/auto: "true"
+
+    replicas: 2
+    strategy: RollingUpdate
+
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    podDisruptionBudget:
+      minAvailable: 1
+    # Override app-template's shared ServiceAccount default.
+    serviceAccount:
+      name: default
+
+    pod:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: lldap
+                  app.kubernetes.io/controller: main
+              topologyKey: kubernetes.io/hostname
+
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+
+    containers:
+      main:
+        image:
+          repository: docker.io/lldap/lldap
+          tag: v0.6.3-debian-rootless@sha256:7a7b5708355dbd56aa59d1496bb5f61b2e26af24ceb44f40e8e596ea34689708
+
+        env:
+          TZ: ${TZ}
+          LLDAP_HTTP_PORT: "17170"
+          LLDAP_HTTP_URL: https://ldap.${BASE_DOMAIN}
+          LLDAP_LDAP_PORT: "3890"
+          LLDAP_LDAP_BASE_DN: ${LDAP_BASE_DN}
+          LLDAP_LDAP_USER_DN: ${LDAP_USER_DN}
+          LLDAP_LDAP_USER_EMAIL: ${EMAIL}
+          LLDAP_JWT_SECRET:
+            valueFrom:
+              secretKeyRef:
+                name: lldap-session
+                key: LLDAP_JWT_SECRET
+          LLDAP_LDAP_USER_PASS:
+            valueFrom:
+              secretKeyRef:
+                name: lldap-admin
+                key: password
+          LLDAP_FORCE_LDAP_USER_PASS_RESET: always
+          LLDAP_database_url:
+            valueFrom:
+              secretKeyRef:
+                name: lldap-postgres-app
+                key: uri
+          # Clear the image's sample seed when using a key file.
+          LLDAP_KEY_SEED: ""
+          LLDAP_key_file: /run/secrets/lldap/private_key
+          LLDAP_SMTP_OPTIONS__SERVER: ${SMTP_HOST}
+          LLDAP_SMTP_OPTIONS__PORT: "587"
+          LLDAP_SMTP_OPTIONS__SMTP_ENCRYPTION: STARTTLS
+          LLDAP_SMTP_OPTIONS__USER: ${SMTP_USER}
+          LLDAP_SMTP_OPTIONS__PASSWORD:
+            valueFrom:
+              secretKeyRef:
+                name: lldap-credentials
+                key: LLDAP_SMTP_OPTIONS__PASSWORD
+          LLDAP_SMTP_OPTIONS__FROM: "LLDAP Admin <lldap@${BASE_DOMAIN}>"
+          LLDAP_SMTP_OPTIONS__REPLY_TO: "Do not reply <lldap@${BASE_DOMAIN}>"
+          LLDAP_SMTP_OPTIONS__ENABLE_PASSWORD_RESET: "false"
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 3890
+              periodSeconds: 5
+              failureThreshold: 30
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 3890
+              periodSeconds: 10
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 3890
+              periodSeconds: 30
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 15m
+            memory: 96Mi
+
+  service-accounts:
+    forceRename: lldap-service-accounts
+    annotations:
+      reloader.stakater.com/auto: "true"
+
+    replicas: 1
+    strategy: Recreate
+
+    serviceAccount:
+      name: lldap-service-accounts
+    pod:
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+
+      automountServiceAccountToken: true
+
+    containers:
+      main:
+        image:
+          repository: docker.io/lldap/lldap
+          tag: v0.6.3-debian-rootless@sha256:7a7b5708355dbd56aa59d1496bb5f61b2e26af24ceb44f40e8e596ea34689708
+
+        command:
+          - bash
+          - /scripts/service-accounts.sh
+
+        env:
+          LLDAP_URL: http://lldap.lldap.svc.cluster.local:17170
+          LLDAP_ADMIN_USERNAME: ${LDAP_USER_DN}
+          LLDAP_ADMIN_PASSWORD:
+            valueFrom:
+              secretKeyRef:
+                name: lldap-admin
+                key: password
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+
+service:
+  main:
+    forceRename: lldap
+    controller: main
+    ports:
+      http:
+        port: 17170
+
+  ldap:
+    forceRename: lldap-ldap
+    controller: main
+    annotations:
+      gatus.home-operations.com/enabled: "true"
+      gatus.home-operations.com/endpoint: |
+        name: LDAP connection
+        group: Identity
+        url: tcp://lldap-ldap.lldap.svc.cluster.local:3890
+        interval: 1m
+        conditions:
+          - "[CONNECTED] == true"
+        alerts:
+          - type: discord
+    ports:
+      ldap:
+        port: 3890
+
+route:
+  main:
+    kind: HTTPRoute
+    labels:
+      gateway-role: internal
+    annotations:
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/name: "LLDAP"
+      gethomepage.dev/group: "Auth"
+      gethomepage.dev/icon: "lldap.svg"
+      gethomepage.dev/href: "https://ldap.${BASE_DOMAIN}"
+      gethomepage.dev/weight: "20"
+    hostnames:
+      - ldap.${BASE_DOMAIN}
+    parentRefs:
+      - name: internal
+        namespace: traefik-internal
+        sectionName: websecure
+    rules:
+      - backendRefs:
+          - identifier: main
+            port: 17170
+
+persistence:
+  data:
+    type: emptyDir
+    globalMounts:
+      - path: /data
+
+  private-key:
+    type: secret
+    name: lldap-private-key
+    advancedMounts:
+      main:
+        main:
+          - path: /run/secrets/lldap/private_key
+            subPath: private_key
+            readOnly: true
+
+  service-accounts-script:
+    type: configMap
+    name: lldap-service-accounts-script
+    advancedMounts:
+      service-accounts:
+        main:
+          - path: /scripts
+            readOnly: true
+
+serviceAccount:
+  service-accounts:
+    forceRename: lldap-service-accounts

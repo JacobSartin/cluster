@@ -1,0 +1,118 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+controllers:
+  main:
+    forceRename: cs2
+    replicas: 0
+
+    strategy: Recreate
+
+    pod:
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+
+    containers:
+      main:
+        image:
+          repository: docker.io/joedwards32/cs2
+          tag: 5.0.1@sha256:ae10b1aa8734498bb6f88d1cc803a88a9dbbb7d19fd37450747432ccc3a41653
+
+        env:
+          TZ: ${TZ}
+          HOME: /home/steam
+          SRCDS_TOKEN:
+            valueFrom:
+              secretKeyRef:
+                name: cs2-token
+                key: token
+          CS2_RCONPW:
+            valueFrom:
+              secretKeyRef:
+                name: cs2-token
+                key: rcon-password
+          CS2_PORT: "27015"
+          CS2_STARTMAP: de_inferno
+          CS2_GAMETYPE: "0"
+          CS2_GAMEMODE: "1"
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command:
+                  - pgrep
+                  - -x
+                  - cs2
+              periodSeconds: 5
+              failureThreshold: 1440
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command:
+                  - pgrep
+                  - -x
+                  - cs2
+              periodSeconds: 10
+              failureThreshold: 3
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command:
+                  - pgrep
+                  - -x
+                  - cs2
+              periodSeconds: 30
+              failureThreshold: 3
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: false
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 999
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            memory: 12Gi
+
+service:
+  game:
+    controller: main
+    type: LoadBalancer
+    annotations:
+      metallb.io/address-pool: games
+      metallb.io/allow-shared-ip: games
+      unifi-port-forward.fiskhe.st/mapping: game
+    ports:
+      game:
+        port: 27015
+        protocol: UDP
+      game-tcp:
+        port: 27015
+        protocol: TCP
+      cstv:
+        port: 27020
+        protocol: UDP
+
+persistence:
+  serverfiles:
+    type: nfs
+    server: ${NAS_IP}
+    path: ${NAS_GAMES_PATH}/cs2
+    globalMounts:
+      - path: /home/steam/cs2-dedicated

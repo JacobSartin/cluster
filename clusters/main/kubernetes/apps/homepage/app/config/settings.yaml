@@ -1,0 +1,39 @@
+---
+title: Home
+theme: dark
+color: slate
+target: _blank
+statusStyle: dot
+disableUpdateCheck: true
+disableIndexing: true
+quicklaunch:
+  searchDescriptions: true
+  provider: duckduckgo
+headerStyle: boxedWidgets
+useEqualHeights: true
+hideVersion: true
+layout:
+  Tools:
+    style: row
+    columns: 4
+    icon: mdi-tools
+  Auth:
+    style: row
+    columns: 2
+    icon: mdi-shield-account
+  External Services:
+    style: row
+    columns: 4
+    icon: mdi-server-network
+  Media:
+    style: row
+    columns: 3
+    icon: mdi-play-circle
+  Metrics:
+    style: row
+    columns: 4
+    icon: mdi-chart-line
+  Overview:
+    style: row
+    columns: 2
+    icon: mdi-calendar-clock

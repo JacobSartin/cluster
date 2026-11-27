@@ -1,0 +1,11 @@
+{
+  "sops.creationEnabled": true,
+  "[yaml]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file"
+  },
+  "emeraldwalk.runonsave": {
+    "commands": [{ "match": "\\.ya?ml$", "cmd": "homelab-fmt \"${file}\"" }]
+  }
+}

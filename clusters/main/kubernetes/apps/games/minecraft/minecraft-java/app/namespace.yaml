@@ -1,0 +1,11 @@
+---
+# Retain the shared namespace and world PVC when removing an app.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minecraft
+  labels:
+    network.jacobsartin.com/egress: entry-point
+    network.jacobsartin.com/ingress: external
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled

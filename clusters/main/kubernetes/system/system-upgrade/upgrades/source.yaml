@@ -1,0 +1,22 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/gitrepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: infrastructure
+  namespace: flux-system
+spec:
+  interval: 30m
+  url: ssh://git@github.com/JacobSartin/infrastructure.git
+  ref:
+    branch: main
+  secretRef:
+    name: infrastructure-deploy-key
+  # Re-include parent directories before the target path.
+  ignore: |
+    /*
+    !/config/
+    /config/*
+    !/config/talos/
+    /config/talos/*
+    !/config/talos/upgrades/

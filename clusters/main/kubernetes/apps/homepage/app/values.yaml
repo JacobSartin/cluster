@@ -1,0 +1,149 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+defaultPodOptions:
+  automountServiceAccountToken: true
+
+controllers:
+  main:
+    forceRename: homepage
+    annotations:
+      reloader.stakater.com/auto: "true"
+    serviceAccount:
+      name: homepage
+
+    pod:
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+
+    containers:
+      main:
+        image:
+          repository: ghcr.io/gethomepage/homepage
+          tag: v2.8.0@sha256:019d8f063a7299e7c1c51ee4a70b692291809af3244894fbec2c2ac7d1f71b18
+
+        env:
+          TZ: ${TZ}
+          LOG_TARGETS: stdout
+          HOMEPAGE_AUTH_ENABLED: "true"
+          HOMEPAGE_AUTH_SECRET:
+            valueFrom:
+              secretKeyRef:
+                name: homepage-session
+                key: auth-secret
+          HOMEPAGE_EXTERNAL_URL: https://home.${BASE_DOMAIN}
+          HOMEPAGE_OIDC_ISSUER: https://auth.${BASE_DOMAIN}
+          HOMEPAGE_OIDC_CLIENT_ID:
+            valueFrom:
+              secretKeyRef:
+                name: homepage-auth
+                key: oidc-client-id
+          HOMEPAGE_OIDC_CLIENT_SECRET:
+            valueFrom:
+              secretKeyRef:
+                name: homepage-auth
+                key: oidc-client-secret
+          HOMEPAGE_OIDC_NAME: Authelia
+          HOMEPAGE_OIDC_SCOPE: "openid email profile groups"
+          HOMEPAGE_OIDC_AUTO_LOGIN: "true"
+          MY_POD_IP:
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          HOMEPAGE_ALLOWED_HOSTS:
+            value: "$(MY_POD_IP):3000,home.${BASE_DOMAIN}"
+            dependsOn: MY_POD_IP
+
+        envFrom:
+          - secretRef:
+              name: homepage-tenant-widgets
+              optional: true
+            prefix: HOMEPAGE_VAR_
+          # Keep local values last for precedence.
+          - secretRef:
+              name: homepage-widgets
+            prefix: HOMEPAGE_VAR_
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /api/healthcheck
+                port: 3000
+              failureThreshold: 30
+              periodSeconds: 5
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /api/healthcheck
+                port: 3000
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /api/healthcheck
+                port: 3000
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsGroup: 1000
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 10m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+
+service:
+  main:
+    forceRename: homepage
+    controller: main
+    ports:
+      main:
+        port: 3000
+        targetPort: 3000
+
+route:
+  main:
+    kind: HTTPRoute
+    labels:
+      gateway-role: internal
+    hostnames:
+      - home.${BASE_DOMAIN}
+    parentRefs:
+      - name: internal
+        namespace: traefik-internal
+        sectionName: websecure
+    rules:
+      - backendRefs:
+          - identifier: main
+            port: 3000
+
+persistence:
+  config:
+    type: configMap
+    name: homepage-config
+    globalMounts:
+      - path: /app/config
+        readOnly: true
+
+  tmp:
+    type: emptyDir
+    medium: Memory
+    sizeLimit: 128Mi
+    globalMounts:
+      - path: /tmp

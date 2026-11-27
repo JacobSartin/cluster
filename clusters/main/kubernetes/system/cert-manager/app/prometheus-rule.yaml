@@ -1,0 +1,63 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+spec:
+  groups:
+    - name: cert-manager
+      rules:
+        - alert: CertManagerCertificateNotReady
+          expr: certmanager_certificate_ready_status{condition!="True"} == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Certificate {{ $labels.exported_namespace }}/{{ $labels.name }} is not ready'
+            description: 'The Ready condition has been {{ $labels.condition }} for 15 minutes. Check the Certificate, its CertificateRequest and its Order.'
+
+        - alert: CertManagerCertificateRenewalStalled
+          expr: time() - certmanager_certificate_renewal_timestamp_seconds > 24 * 3600
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Certificate {{ $labels.exported_namespace }}/{{ $labels.name }} has not renewed'
+            description: 'Renewal was due {{ $value | humanizeDuration }} ago. Check the Order and the ACME challenge; a rejected DNS provider token stalls every certificate of the issuer.'
+
+        - alert: CertManagerCertificateRenewalOverdue
+          expr: certmanager_certificate_expiration_timestamp_seconds - time() < 21 * 24 * 3600
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Certificate {{ $labels.exported_namespace }}/{{ $labels.name }} expires in {{ $value | humanizeDuration }}'
+            description: Renewal is more than a week overdue. Check the CertificateRequest, the Order and the ACME challenge.
+
+        - alert: CertManagerCertificateExpiringSoon
+          expr: certmanager_certificate_expiration_timestamp_seconds - time() < 7 * 24 * 3600
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: 'Certificate {{ $labels.exported_namespace }}/{{ $labels.name }} expires in {{ $value | humanizeDuration }}'
+            description: Clients reject the certificate once it expires. Renew it by hand if the Order cannot complete.
+
+        - alert: CertManagerACMERateLimited
+          expr: sum by (host) (rate(certmanager_http_acme_client_request_count{status="429"}[15m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'cert-manager is rate limited by {{ $labels.host }}'
+            description: The ACME server answers 429. Stop whatever keeps creating Orders before the limit blocks a needed renewal.
+
+        - alert: CertManagerMetricsMissing
+          expr: absent(up{job="cert-manager"} == 1)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: cert-manager metrics are missing
+            description: Prometheus has not seen a healthy cert-manager target for 15 minutes, so a failed renewal would go unnoticed.

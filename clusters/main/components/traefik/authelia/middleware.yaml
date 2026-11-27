@@ -1,0 +1,18 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: authelia
+  labels:
+    gateway-role: shared
+spec:
+  forwardAuth:
+    address: http://authelia.authelia.svc.cluster.local:9091/api/authz/forward-auth
+    # Required until Traefik v4 despite deprecation.
+    trustForwardHeader: true
+    maxResponseBodySize: 8192
+    authResponseHeaders:
+      - Remote-User
+      - Remote-Groups
+      - Remote-Email
+      - Remote-Name

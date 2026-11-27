@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - gatus/ks.yaml
+  - grafana-operator/ks.yaml
+  - grafana-alloy/ks.yaml
+  - grafana-loki/ks.yaml
+  - headlamp/ks.yaml
+  - prometheus-operator-crds/ks.yaml
+  - kube-prometheus-stack/ks.yaml
+  - unpoller/ks.yaml

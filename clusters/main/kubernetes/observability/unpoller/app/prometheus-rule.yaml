@@ -1,0 +1,58 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: unpoller
+  namespace: unpoller
+spec:
+  groups:
+    - name: unpoller.health
+      rules:
+        - alert: UnpollerControllerUnavailable
+          expr: unpoller_controller_up{namespace="unpoller",job="unpoller"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Unpoller cannot collect data from its UniFi controller
+            description: Check controller reachability, authentication, and rate limits. A healthy metrics endpoint does not guarantee a successful controller poll.
+
+        - alert: UnpollerMetricsStale
+          expr: |
+            unpoller_prometheus_cache_age_seconds{namespace="unpoller",job="unpoller"} > 300
+            or unpoller_prometheus_cache_age_seconds{namespace="unpoller",job="unpoller"} < 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Unpoller is serving stale or uninitialized metrics
+            description: The metrics cache has not refreshed successfully within five minutes, or no refresh has succeeded since startup.
+
+        - alert: UnifiControllerSlow
+          expr: max by (namespace) (max_over_time(unpoller_prometheus_cache_age_seconds{namespace="unpoller",job="unpoller"}[10m])) > 120
+          for: 30m
+          keep_firing_for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: The UniFi controller API answers Unpoller too slowly
+            description: For 30 minutes, Unpoller's metrics cache has kept going more than two minutes without a completed refresh; refreshes normally finish within seconds every minute. Check UnifiGatewayOverloaded and the Network app's heap.
+
+        - alert: UnpollerMetricsMissing
+          expr: absent(unpoller_prometheus_cache_age_seconds{namespace="unpoller",job="unpoller"})
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Unpoller metrics are missing
+            description: Check the Unpoller Deployment, ServiceMonitor, and Prometheus target.
+    - name: unifi.gateway
+      rules:
+        - alert: UnifiGatewayOverloaded
+          expr: max by (namespace, name) (unpoller_device_load_average_15{namespace="unpoller",job="unpoller",type="udm"}) > 6
+          for: 30m
+          keep_firing_for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: UniFi gateway {{ $labels.name }} is overloaded
+            description: Its 15-minute load average has stayed above 6 on 4 cores; it normally sits near 3. If /usr/lib/unifi/logs/gc.log shows back-to-back full GCs, restart the Network app with systemctl restart unifi.

@@ -1,0 +1,21 @@
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: main
+  namespace: metallb
+spec:
+  addresses:
+    - ${METALLB_POOL_MAIN}
+  avoidBuggyIPs: true
+  serviceAllocation:
+    namespaceSelectors:
+      - matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: DoesNotExist
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: main
+  namespace: metallb

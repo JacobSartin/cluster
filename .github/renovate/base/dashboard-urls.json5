@@ -1,0 +1,21 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  customManagers: [
+    {
+      customType: "regex",
+      description: "Update versioned GrafanaDashboard URLs",
+      managerFilePatterns: ["/\\.ya?ml$/"],
+      matchStrings: [
+        "# renovate-dashboard: depName=(?<depName>\\S+) datasource=(?<datasource>\\S+)(?: versioning=(?<versioning>\\S+))?\\s+url: https://raw\\.githubusercontent\\.com/[^/\\s]+/[^/\\s]+/(?<currentValue>[^/\\s]+)/",
+      ],
+      depTypeTemplate: "grafana-dashboard",
+    },
+  ],
+  packageRules: [
+    {
+      description: "Dashboard URLs hold a version only; there is nowhere to pin a digest",
+      matchDepTypes: ["grafana-dashboard"],
+      pinDigests: false,
+    },
+  ],
+}

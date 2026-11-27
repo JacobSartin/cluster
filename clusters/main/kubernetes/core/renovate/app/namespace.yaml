@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: renovate
+  labels:
+    network.jacobsartin.com/egress: entry-point
+    network.jacobsartin.com/ingress: external
+    pod-security.kubernetes.io/enforce: restricted

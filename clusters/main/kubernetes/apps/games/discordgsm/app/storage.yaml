@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: discordgsm-data
+  namespace: discordgsm
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/external-secrets.io/externalsecret_v1.json
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: discordgsm-restic
+  namespace: discordgsm
+spec:
+  refreshInterval: 1h
+  target:
+    name: discordgsm-restic
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      type: Opaque
+      data:
+        AWS_ACCESS_KEY_ID: "{{ .r2AccessKeyId }}"
+        AWS_SECRET_ACCESS_KEY: "{{ .r2SecretAccessKey }}"
+        RESTIC_PASSWORD: '{{ if lt (len .resticRoot) 64 }}{{ .resticRootTooShort }}{{ end }}{{ printf "%s:discordgsm/discordgsm-restic" .resticRoot | sha256sum }}'
+        RESTIC_REPOSITORY: "s3:https://${R2URL}/${S3BUCKET}-discordgsm/app-template/data"
+  data:
+    - secretKey: r2AccessKeyId
+      sourceRef:
+        storeRef:
+          kind: ClusterSecretStore
+          name: backup
+      remoteRef:
+        key: backup
+        property: r2-access-key-id
+    - secretKey: r2SecretAccessKey
+      sourceRef:
+        storeRef:
+          kind: ClusterSecretStore
+          name: backup
+      remoteRef:
+        key: backup
+        property: r2-secret-access-key
+    - secretKey: resticRoot
+      sourceRef:
+        storeRef:
+          kind: ClusterSecretStore
+          name: backup
+      remoteRef:
+        key: backup
+        property: restic-root
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: discordgsm-data
+  namespace: discordgsm
+spec:
+  sourcePVC: discordgsm-data
+  trigger:
+    schedule: 0 0 * * *
+  restic:
+    repository: discordgsm-restic
+    copyMethod: Snapshot
+    pruneIntervalDays: 7
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 3
+      yearly: 1
+    accessModes: [ReadWriteOnce]
+    cacheCapacity: 1Gi
+    moverSecurityContext:
+      fsGroup: 568
+      runAsGroup: 568
+      runAsNonRoot: true
+      runAsUser: 568
+      seccompProfile:
+        type: RuntimeDefault

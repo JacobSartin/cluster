@@ -1,0 +1,121 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: flux-impersonation
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["kustomize.toolkit.fluxcd.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["kustomizations"]
+      - apiGroups: ["helm.toolkit.fluxcd.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["helmreleases"]
+  matchConditions:
+    - name: not-flux-or-kubernetes
+      expression: >-
+        !('system:masters' in request.userInfo.groups) &&
+        !request.userInfo.username.startsWith('system:serviceaccount:flux-system:') &&
+        !request.userInfo.username.startsWith('system:serviceaccount:kube-system:') &&
+        (request.userInfo.username.startsWith('system:serviceaccount:') ||
+         !request.userInfo.username.startsWith('system:'))
+  variables:
+    - name: spec
+      expression: dyn(object).spec
+    - name: controller
+      expression: "request.resource.resource == 'helmreleases' ? 'helm-controller' : 'kustomize-controller'"
+    - name: admin
+      expression: >-
+        authorizer.group('').resource('serviceaccounts').namespace('flux-system')
+        .name(variables.controller).check('impersonate').allowed()
+    - name: serviceAccount
+      expression: variables.spec.?serviceAccountName.orValue('')
+    - name: chart
+      expression: variables.spec.?chartRef.orValue(variables.spec.?chart.?spec.?sourceRef.orValue({}))
+    - name: chartNamespace
+      expression: variables.chart.?namespace.orValue(request.namespace)
+    - name: chartKind
+      expression: variables.chart.?kind.orValue('')
+    - name: sourceResources
+      expression: >-
+        {'Bucket': 'buckets', 'ExternalArtifact': 'externalartifacts', 'GitRepository': 'gitrepositories',
+         'HelmChart': 'helmcharts', 'HelmRepository': 'helmrepositories', 'OCIRepository': 'ocirepositories'}
+  validations:
+    - expression: >-
+        variables.admin ||
+        (variables.serviceAccount != '' &&
+         (request.userInfo.username == 'system:serviceaccount:' + request.namespace + ':' + variables.serviceAccount ||
+          authorizer.group('').resource('serviceaccounts').namespace(request.namespace)
+          .name(variables.serviceAccount).check('impersonate').allowed()))
+      messageExpression: >-
+        request.userInfo.username + ' may not have Flux act as ' +
+        (variables.serviceAccount == '' ? 'flux-system/' + variables.controller :
+         request.namespace + '/' + variables.serviceAccount)
+    - expression: variables.admin || !variables.spec.?kubeConfig.hasValue()
+      message: only admins may give Flux a kubeConfig
+    - expression: >-
+        variables.admin || request.resource.resource != 'helmreleases' ||
+        variables.chartNamespace == request.namespace ||
+        (variables.chartNamespace == 'flux-system' && variables.chartKind in ['HelmRepository', 'OCIRepository']) ||
+        authorizer.group('source.toolkit.fluxcd.io')
+        .resource(variables.sourceResources[?variables.chartKind].orValue(''))
+        .namespace(variables.chartNamespace).name(variables.chart.?name.orValue('')).check('get').allowed()
+      messageExpression: >-
+        request.userInfo.username + ' may not use the chart source ' + variables.chartKind + ' ' +
+        variables.chartNamespace + '/' + variables.chart.?name.orValue('')
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: flux-impersonation
+spec:
+  policyName: flux-impersonation
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: flux-service-account
+spec:
+  failurePolicy: Fail
+  reinvocationPolicy: Never
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["kustomize.toolkit.fluxcd.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["kustomizations"]
+      - apiGroups: ["helm.toolkit.fluxcd.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["helmreleases"]
+  matchConditions:
+    - name: not-flux-or-kubernetes
+      expression: >-
+        !('system:masters' in request.userInfo.groups) &&
+        !request.userInfo.username.startsWith('system:serviceaccount:flux-system:') &&
+        !request.userInfo.username.startsWith('system:serviceaccount:kube-system:') &&
+        (request.userInfo.username.startsWith('system:serviceaccount:') ||
+         !request.userInfo.username.startsWith('system:'))
+    - name: no-service-account
+      expression: "!dyn(object).spec.?serviceAccountName.hasValue()"
+    - name: not-admin
+      expression: >-
+        !authorizer.group('').resource('serviceaccounts').namespace('flux-system')
+        .name(request.resource.resource == 'helmreleases' ? 'helm-controller' : 'kustomize-controller')
+        .check('impersonate').allowed()
+  mutations:
+    - patchType: JSONPatch
+      jsonPatch:
+        expression: "[JSONPatch{op: 'add', path: '/spec/serviceAccountName', value: 'flux'}]"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: flux-service-account
+spec:
+  policyName: flux-service-account

@@ -1,0 +1,31 @@
+---
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - middleware.yaml
+patches:
+  - target:
+      version: v1
+      kind: Namespace
+    patch: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: unused
+        labels:
+          auth.jacobsartin.com/authelia: enabled
+# ExtensionRef requires a same-namespace Middleware.
+replacements:
+  - source:
+      kind: Namespace
+      fieldPath: metadata.name
+    targets:
+      - select:
+          group: traefik.io
+          version: v1alpha1
+          kind: Middleware
+          name: authelia
+        fieldPaths:
+          - metadata.namespace
+        options:
+          create: true

@@ -1,0 +1,19 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["helpers:pinGitHubActionDigests"],
+  packageRules: [
+    {
+      description: "Hold actions, mise tools and npm packages for three days; the owner's own repositories are not delayed",
+      matchManagers: ["github-actions", "mise", "npm"],
+      matchPackageNames: ["!/(^|[:/])JacobSartin\\//i"],
+      minimumReleaseAge: "3 days",
+    },
+    {
+      description: "Keep the shared homelab CI workflows on their moving main reference",
+      matchManagers: ["github-actions"],
+      matchPackageNames: ["JacobSartin/homelab-ci"],
+      matchDepTypes: ["action", "workflow"],
+      pinDigests: false,
+    },
+  ],
+}

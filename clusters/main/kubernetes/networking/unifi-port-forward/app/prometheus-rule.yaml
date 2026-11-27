@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: unifi-port-forward
+  namespace: unifi-port-forward
+spec:
+  groups:
+    - name: unifi-port-forward.health
+      rules:
+        - alert: UnifiPortForwardErrors
+          expr: sum(increase(loki_process_custom_unifi_port_forward_errors_total[30m])) > 0
+          for: 45m
+          labels:
+            severity: warning
+          annotations:
+            summary: unifi-port-forward keeps logging errors
+            description: Errors in every 30-minute window for 45 minutes; one-off errors right after a restart do not fire. Check the controller log and PortForwardFailed events on annotated Services.
+
+        - alert: UnifiPortForwardSyncMissing
+          expr: (sum(increase(loki_process_custom_unifi_port_forward_clean_syncs_total[40m])) or vector(0)) == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: unifi-port-forward has not finished a clean drift check for 40 minutes
+            description: Its periodic check runs every 15 minutes and logs failed_operations=0 when every rule matches. A failing Service aborts the check for all Services.

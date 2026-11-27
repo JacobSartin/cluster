@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: renovate
+  namespace: renovate
+spec:
+  interval: 15m
+  chartRef:
+    kind: OCIRepository
+    name: mend-renovate-ce
+    namespace: flux-system
+  timeout: 20m
+  valuesFrom:
+    - kind: ConfigMap
+      name: renovate-values
+      valuesKey: values.yaml
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Deployment
+              name: renovate
+            patch: |-
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: renovate
+              spec:
+                template:
+                  spec:
+                    automountServiceAccountToken: false

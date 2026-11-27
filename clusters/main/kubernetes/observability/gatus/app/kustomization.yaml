@@ -1,0 +1,47 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization.json
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - secret.sops.yaml
+  - healthchecks-secret.sops.yaml
+  - helm-release.yaml
+  - prometheus-rule.yaml
+  - rbac.yaml
+  - service-monitor.yaml
+
+components:
+  - ../../../../components/traefik/authelia
+  - ../../../../components/lldap/service-account
+
+patches:
+  - target:
+      kind: ExternalSecret
+      name: lldap-service-account
+    patch: |-
+      apiVersion: external-secrets.io/v1
+      kind: ExternalSecret
+      metadata:
+        name: lldap-service-account
+      spec:
+        target:
+          template:
+            data:
+              basic: '{{ printf "svc-gatus:%s" .password | b64enc }}'
+
+configMapGenerator:
+  - name: gatus-values
+    namespace: gatus
+    files:
+      - values.yaml
+    options:
+      disableNameSuffixHash: true
+      labels:
+        reconcile.fluxcd.io/watch: Enabled
+  - name: gatus-config
+    namespace: gatus
+    files:
+      - config.yaml
+    options:
+      disableNameSuffixHash: true

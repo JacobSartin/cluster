@@ -1,0 +1,17 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended"],
+  dependencyDashboardTitle: "Renovate Dashboard 🤖",
+  // Must match the installation's bot identity.
+  gitAuthor: "sartin-renovate[bot] <336674714+sartin-renovate[bot]@users.noreply.github.com>",
+  abandonmentThreshold: "1 year",
+  timezone: "America/Chicago",
+  schedule: ["* 2-8 * * *"],
+  prHourlyLimit: 0,
+  prConcurrentLimit: 0,
+  suppressNotifications: ["prEditedNotification", "prIgnoreNotification"],
+  ignorePaths: ["**/*.sops.*"],
+  pinDigests: true,
+  separateMinorPatch: true,
+  lockFileMaintenance: { enabled: true },
+}

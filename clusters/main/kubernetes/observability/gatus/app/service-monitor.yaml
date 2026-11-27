@@ -1,0 +1,18 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gatus
+  namespace: gatus
+spec:
+  namespaceSelector:
+    matchNames: [gatus]
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: gatus
+      app.kubernetes.io/service: gatus
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

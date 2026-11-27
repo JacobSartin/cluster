@@ -1,0 +1,28 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumnetworkpolicy_v2.json
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: codeserver-ingress
+spec:
+  endpointSelector: {}
+  enableDefaultDeny:
+    ingress: false
+  ingressDeny:
+    - fromEndpoints:
+        - matchExpressions:
+            - key: k8s:io.kubernetes.pod.namespace
+              operator: NotIn
+              values:
+                - traefik-internal
+      toPorts:
+        - ports:
+            - port: "12321"
+              protocol: TCP
+    - fromEntities:
+        - world
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "12321"
+              protocol: TCP

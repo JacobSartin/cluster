@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "age public keys"
+regexes = ['''^age1[02-9ac-hj-np-z]{58}$''']

@@ -1,0 +1,17 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  packageRules: [
+    {
+      description: [
+        "Review CloudNativePG operator minors by hand: each chart minor is an operator minor,",
+        "and those remove deprecated Cluster APIs (in-tree Barman Cloud backups go in 1.31).",
+      ],
+      matchManagers: ["flux"],
+      matchDepNames: ["cloudnative-pg"],
+      matchUpdateTypes: ["minor"],
+      automerge: false,
+      addLabels: ["manual"],
+      assignees: ["JacobSartin"],
+    },
+  ],
+}

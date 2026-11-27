@@ -1,0 +1,45 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: lldap-postgres
+  namespace: lldap
+spec:
+  instances: 2
+  resources:
+    requests:
+      cpu: 25m
+      memory: 256Mi
+  affinity:
+    podAntiAffinityType: required
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-standard-trixie
+    major: 19
+  storage:
+    size: 5Gi
+  walStorage:
+    size: 10Gi
+  postgresql:
+    parameters:
+      max_slot_wal_keep_size: 5GB
+  # Recovery must archive under a new serverName.
+  bootstrap:
+    recovery:
+      source: lldap-postgres
+      database: lldap
+      owner: lldap
+  # Update serverName with the Postgres major.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: lldap-rustfs
+        serverName: lldap-postgres-pg19
+  externalClusters:
+    - name: lldap-postgres
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: lldap-rustfs
+          serverName: lldap-postgres-pg19

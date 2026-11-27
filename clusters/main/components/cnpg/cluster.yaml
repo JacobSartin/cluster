@@ -1,0 +1,8 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: unused
+spec:
+  # Pooled clients never disconnect, so a smart shutdown only waits out its timeout.
+  smartShutdownTimeout: 5

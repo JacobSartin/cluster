@@ -1,0 +1,125 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  main:
+    forceRename: actualserver
+    strategy: Recreate
+
+    pod:
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+        supplementalGroups:
+          - 568
+
+    containers:
+      main:
+        image:
+          repository: ghcr.io/actualbudget/actual
+          tag: 26.11.0@sha256:06cf186569cf58d93e12659ff1a517b65b5b0ebee7050a3991d4bd8a1d398da6
+
+        env:
+          TZ: ${TZ}
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                port: 5006
+                path: /
+                scheme: HTTP
+              initialDelaySeconds: 10
+              failureThreshold: 60
+              successThreshold: 1
+              timeoutSeconds: 3
+              periodSeconds: 5
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                port: 5006
+                path: /
+                scheme: HTTP
+              initialDelaySeconds: 10
+              failureThreshold: 4
+              successThreshold: 2
+              timeoutSeconds: 5
+              periodSeconds: 12
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                port: 5006
+                path: /
+                scheme: HTTP
+              initialDelaySeconds: 12
+              failureThreshold: 5
+              successThreshold: 1
+              timeoutSeconds: 5
+              periodSeconds: 15
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 75m
+            memory: 200Mi
+          limits:
+            cpu: 1500m
+            memory: 2400Mi
+
+service:
+  main:
+    forceRename: actualserver
+    controller: main
+    ports:
+      main:
+        port: 10293
+        targetPort: 5006
+
+route:
+  main:
+    kind: HTTPRoute
+    labels:
+      gateway-role: internal
+    hostnames:
+      - actual.${BASE_DOMAIN}
+    parentRefs:
+      - name: internal
+        namespace: traefik-internal
+        sectionName: websecure
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        backendRefs:
+          - identifier: main
+            port: 10293
+
+persistence:
+  data:
+    existingClaim: actualserver-data
+    globalMounts:
+      - path: /data
+
+  tmp:
+    type: emptyDir
+    globalMounts:
+      - path: /tmp

@@ -1,0 +1,21 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+# Renaming recreates the managed upgrade plans.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: tuppr-plans
+  namespace: flux-system
+  labels:
+    substitution.flux.home.arpa/disabled: "true"
+spec:
+  dependsOn:
+    - name: tuppr
+  interval: 1h
+  path: ./config/talos/upgrades
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: infrastructure
+  wait: false
+  serviceAccountName: tuppr-plans

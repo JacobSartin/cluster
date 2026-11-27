@@ -1,0 +1,40 @@
+---
+# Use separate rules; the upstream "both" protocol is unsupported.
+apiVersion: unifi-port-forward.fiskhe.st/v1alpha1
+kind: PortForwardRule
+metadata:
+  name: assettocorsa-game-wan-tcp
+  namespace: assettocorsa
+spec:
+  description: Assetto Corsa game traffic (TCP)
+  externalPort: 9600
+  protocol: tcp
+  serviceRef:
+    name: assettocorsa-game
+    port: tcp
+---
+apiVersion: unifi-port-forward.fiskhe.st/v1alpha1
+kind: PortForwardRule
+metadata:
+  name: assettocorsa-game-wan-udp
+  namespace: assettocorsa
+spec:
+  description: Assetto Corsa game traffic (UDP)
+  externalPort: 9600
+  protocol: udp
+  serviceRef:
+    name: assettocorsa-game
+    port: udp
+---
+apiVersion: unifi-port-forward.fiskhe.st/v1alpha1
+kind: PortForwardRule
+metadata:
+  name: assettocorsa-api-wan
+  namespace: assettocorsa
+spec:
+  description: Assetto Corsa lobby web API
+  externalPort: 8081
+  protocol: tcp
+  serviceRef:
+    name: assettocorsa-game
+    port: api

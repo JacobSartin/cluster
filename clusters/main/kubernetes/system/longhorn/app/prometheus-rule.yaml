@@ -1,0 +1,72 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: longhorn
+  namespace: longhorn-system
+spec:
+  groups:
+    - name: longhorn
+      rules:
+        - alert: LonghornVolumeFaulted
+          expr: longhorn_volume_robustness{state="faulted"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'Longhorn volume {{ $labels.volume }} ({{ $labels.pvc_namespace }}/{{ $labels.pvc }}) is faulted'
+            description: The volume has had no usable replica for 5 minutes and cannot serve I/O. Salvage a replica in the Longhorn UI before deleting anything.
+
+        - alert: LonghornVolumeDegraded
+          expr: longhorn_volume_robustness{state="degraded"} == 1
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Longhorn volume {{ $labels.volume }} ({{ $labels.pvc_namespace }}/{{ $labels.pvc }}) has been degraded for an hour'
+            description: A replica is missing and no rebuild has replaced it. A node left cordoned after a reboot blocks the rebuild; uncordon it or find out why the rebuild fails.
+
+        - alert: LonghornVolumeReadOnly
+          expr: longhorn_volume_file_system_read_only == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'Longhorn volume {{ $labels.volume }} ({{ $labels.pvc_namespace }}/{{ $labels.pvc }}) is read-only'
+            description: The filesystem remounted read-only after an I/O error, usually a full disk or a lost engine. Fix the cause, then restart the workload to remount.
+
+        - alert: LonghornNodeNotReady
+          expr: longhorn_node_status{condition="ready"} == 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Longhorn node {{ $labels.node }} is not ready: {{ $labels.condition_reason }}'
+            description: Replicas on the node are unavailable and volumes with a replica there are degraded. Expected while the node is down for maintenance.
+
+        - alert: LonghornDiskSpaceLow
+          expr: longhorn_disk_usage_bytes / longhorn_disk_capacity_bytes > 0.85
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Longhorn disk {{ $labels.disk }} on {{ $labels.node }} is {{ $value | humanizePercentage }} full'
+            description: Longhorn stops scheduling replicas on a disk near its reserved space, and a full disk turns every volume with a replica on it read-only. Trim or move volumes.
+
+        - alert: LonghornDiskUnhealthy
+          expr: longhorn_disk_health == 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Longhorn disk {{ $labels.disk }} on {{ $labels.node }} is unhealthy'
+            description: Longhorn's disk health check has failed for 15 minutes. Check the host disk and its SMART data in Scrutiny.
+
+        - alert: LonghornMetricsMissing
+          expr: absent(up{job="longhorn-backend"} == 1)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Longhorn metrics are missing
+            description: Prometheus has not seen a healthy longhorn-manager target for 15 minutes, so storage faults would go unnoticed.

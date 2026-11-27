@@ -1,0 +1,9 @@
+---
+# Match both slash and backslash path separators.
+creation_rules:
+  - path_regex: ^clusters.*\.sops\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    mac_only_encrypted: true
+    age: >-
+      age1tpc0yytufplgg0gucz7ze52vhx0c0j6lvzctmy0kfg4fhyy444gqedj494,
+      age1h8c7nenuf7rn6qjmackxrlt3nvjfyk77mw7ujnrsnnspkcle8s7qjsamhs

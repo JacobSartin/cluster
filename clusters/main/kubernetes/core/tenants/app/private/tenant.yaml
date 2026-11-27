@@ -1,0 +1,18 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: private
+spec:
+  owners:
+    - kind: ServiceAccount
+      name: system:serviceaccount:private-system:flux
+      clusterRoles:
+        - private-tenant-namespace-admin
+        - capsule-namespace-deleter
+  additionalRoleBindings:
+    - clusterRoleName: authelia-oidc-client-reader
+      subjects:
+        - kind: ServiceAccount
+          name: authelia-oidc-reader
+          namespace: authelia

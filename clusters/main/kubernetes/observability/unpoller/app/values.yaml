@@ -1,0 +1,125 @@
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+---
+controllers:
+  main:
+    forceRename: unpoller
+    replicas: 1
+
+    strategy: Recreate
+
+    pod:
+      annotations:
+        secret.reloader.stakater.com/reload: unpoller-controller
+      securityContext:
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+
+    containers:
+      main:
+        image:
+          repository: ghcr.io/unpoller/unpoller
+          tag: v5.10.2@sha256:1bd77eecb10f00c2f57d33a63fc1b3ccca73f3b5f0a9d13d2f9ab467e32bd6fb
+
+        env:
+          TZ: ${TZ}
+
+          UP_UNIFI_DEFAULT_URL: https://${GATEWAY}
+          UP_UNIFI_DEFAULT_USER:
+            valueFrom:
+              secretKeyRef:
+                name: unpoller-controller
+                key: username
+          UP_UNIFI_DEFAULT_PASS:
+            valueFrom:
+              secretKeyRef:
+                name: unpoller-controller
+                key: password
+          UP_UNIFI_DEFAULT_TIMEOUT: 3m
+          UP_UNIFI_DEFAULT_VERIFY_SSL: "false"
+
+          UP_UNIFI_DEFAULT_SAVE_SITES: "true"
+          UP_UNIFI_DEFAULT_SAVE_DPI: "true"
+          UP_UNIFI_DEFAULT_SAVE_SPEEDTEST: "false"
+
+          UP_UNIFI_DEFAULT_SAVE_SYSLOG: "true"
+          UP_UNIFI_DEFAULT_SAVE_EVENTS: "false"
+
+          UP_PROMETHEUS_DISABLE: "false"
+          UP_PROMETHEUS_HTTP_LISTEN: 0.0.0.0:9130
+          UP_PROMETHEUS_NAMESPACE: unpoller
+          UP_PROMETHEUS_INTERVAL: 60s
+
+          UP_LOKI_DISABLE: "false"
+          UP_LOKI_URL: http://grafana-loki-gateway.grafana-loki.svc.cluster.local
+          UP_LOKI_INTERVAL: 2m
+          UP_LOKI_TIMEOUT: 10s
+
+          UP_INFLUXDB_DISABLE: "true"
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 9130
+              periodSeconds: 5
+              timeoutSeconds: 3
+              failureThreshold: 60
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 9130
+              periodSeconds: 10
+              timeoutSeconds: 5
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /
+                port: 9130
+              periodSeconds: 15
+              timeoutSeconds: 5
+              failureThreshold: 3
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 75m
+            memory: 200Mi
+          limits:
+            memory: 2400Mi
+
+service:
+  main:
+    forceRename: unpoller
+    controller: main
+    ports:
+      main:
+        port: 9130
+
+serviceMonitor:
+  main:
+    forceRename: unpoller
+    service:
+      identifier: main
+    endpoints:
+      - port: main
+        path: /metrics
+        interval: 30s
+        scrapeTimeout: 10s

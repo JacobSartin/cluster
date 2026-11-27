@@ -1,0 +1,233 @@
+---
+# renovate-schema: datasource=docker depName=ghcr.io/bjw-s-labs/helm/app-template registryUrl=https://ghcr.io
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-5.3.0/charts/other/app-template/values.schema.json
+controllers:
+  blocky:
+    type: deployment
+    replicas: 2
+    strategy: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    podDisruptionBudget:
+      minAvailable: 1
+
+    serviceAccount:
+      name: blocky
+    pod:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: blocky
+                  app.kubernetes.io/controller: blocky
+              topologyKey: kubernetes.io/hostname
+
+      securityContext:
+        fsGroup: 568
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 568
+        runAsNonRoot: true
+        runAsUser: 568
+        seccompProfile:
+          type: RuntimeDefault
+
+      automountServiceAccountToken: true
+
+    containers:
+      app:
+        image:
+          repository: ghcr.io/0xerr0r/blocky
+          tag: v0.37.0@sha256:d9b6344d7c8f3fe577a47bc97b523faa116f7ea8a8901bfaf800a4dbdce64c96
+
+        env:
+          TZ: ${TZ}
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command: [/app/blocky, healthcheck]
+              periodSeconds: 5
+              timeoutSeconds: 3
+              failureThreshold: 60
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command: [/app/blocky, healthcheck]
+              periodSeconds: 12
+              timeoutSeconds: 5
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              exec:
+                command: [/app/blocky, healthcheck]
+              periodSeconds: 15
+              timeoutSeconds: 5
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+          readOnlyRootFilesystem: true
+
+        resources:
+          requests:
+            cpu: 75m
+            memory: 200Mi
+          limits:
+            cpu: 1500m
+            memory: 2400Mi
+
+      gateway:
+        image:
+          repository: ghcr.io/k8s-gateway/k8s_gateway
+          tag: 1.8.2@sha256:e7d334bc486fc78e2f2366da2029b7308240d500330e85d2367d4d9cc46a5e52
+
+        args: [-conf, /etc/coredns/Corefile]
+
+        probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /ready
+                port: 8181
+              failureThreshold: 30
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /ready
+                port: 8181
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /health
+                port: 8080
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+          readOnlyRootFilesystem: true
+          runAsGroup: 568
+          runAsNonRoot: true
+          runAsUser: 568
+
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+
+service:
+  app:
+    forceRename: blocky
+    controller: blocky
+    ports:
+      http:
+        port: 4000
+
+  dns:
+    forceRename: blocky-dns
+    controller: blocky
+    type: LoadBalancer
+    externalTrafficPolicy: Local
+    annotations:
+      gatus.home-operations.com/enabled: "true"
+      gatus.home-operations.com/endpoint: |
+        name: Blocky DNS
+        group: DNS
+        url: blocky-dns.blocky.svc.cluster.local:53
+        interval: 1m
+        dns:
+          query-name: cloudflare.com
+          query-type: A
+        conditions:
+          - "[DNS_RCODE] == NOERROR"
+          - "len([BODY]) > 0"
+        alerts:
+          - type: discord
+      metallb.io/address-pool: dns
+    ports:
+      dns:
+        port: 53
+        protocol: UDP
+      dns-tcp:
+        port: 53
+        protocol: TCP
+
+  dot:
+    forceRename: blocky-dot
+    controller: blocky
+    ports:
+      dot:
+        port: 853
+        protocol: TCP
+
+  https:
+    forceRename: blocky-https
+    controller: blocky
+    ports:
+      https:
+        port: 4443
+        protocol: TCP
+
+  gateway:
+    forceRename: blocky-k8sgateway
+    controller: blocky
+    ports:
+      dns:
+        port: 5353
+        protocol: UDP
+
+serviceMonitor:
+  app:
+    forceRename: blocky
+    service:
+      identifier: app
+    endpoints:
+      - port: http
+        path: /metrics
+
+persistence:
+  config:
+    type: configMap
+    name: blocky-config
+    advancedMounts:
+      blocky:
+        app:
+          - path: /app/config.yml
+            subPath: config.yml
+            readOnly: true
+
+  corefile:
+    type: configMap
+    name: blocky-corefile
+    advancedMounts:
+      blocky:
+        gateway:
+          - path: /etc/coredns/Corefile
+            subPath: Corefile
+            readOnly: true
+
+  tmp:
+    type: emptyDir
+    globalMounts:
+      - path: /tmp
+
+serviceAccount:
+  blocky:
+    forceRename: blocky

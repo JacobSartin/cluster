@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - helm-release.yaml
+  - rbac.yaml
+  - oidc.yaml
+  - session-secrets.yaml
+  - widgets.secret.sops.yaml
+  - tenant-widgets.yaml
+
+configMapGenerator:
+  - name: homepage-values
+    namespace: homepage
+    files:
+      - values.yaml
+    options:
+      disableNameSuffixHash: true
+      labels:
+        reconcile.fluxcd.io/watch: Enabled
+  - name: homepage-config
+    namespace: homepage
+    files:
+      - config/bookmarks.yaml
+      - config/custom.css
+      - config/custom.js
+      - config/docker.yaml
+      - config/kubernetes.yaml
+      - config/proxmox.yaml
+      - config/services.yaml
+      - config/settings.yaml
+      - config/widgets.yaml
+    options:
+      disableNameSuffixHash: true

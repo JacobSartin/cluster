@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/external-secrets.io/externalsecret_v1.json
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: cluster-settings
+  namespace: private-system
+spec:
+  refreshInterval: 10m
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: cluster-settings
+  target:
+    name: cluster-settings
+    creationPolicy: Owner
+    template:
+      metadata:
+        labels:
+          reconcile.fluxcd.io/watch: Enabled
+  dataFrom:
+    - extract:
+        key: cluster-settings

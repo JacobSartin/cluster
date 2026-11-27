@@ -1,0 +1,36 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: lldap-service-accounts
+
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - list
+  # List requests require a matching metadata.name field selector.
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    resourceNames:
+      - lldap-service-account
+    verbs:
+      - get
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lldap-service-accounts
+
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: lldap-service-accounts
+subjects:
+  - kind: ServiceAccount
+    name: lldap-service-accounts
+    namespace: lldap

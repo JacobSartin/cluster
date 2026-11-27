@@ -1,0 +1,18 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: bytestash
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: external-secrets-stores
+    - name: volsync
+    - name: gateway-api-crds
+    - name: traefik-internal
+    - name: longhorn
+  interval: 10m
+  path: clusters/main/kubernetes/apps/tools/bytestash/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: cluster
